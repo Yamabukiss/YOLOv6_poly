@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy
 from yolov6.utils.figure_iou import IOUloss
+from yolov6.utils.l1_loss import l1loss
 from yolov6.assigners.atss_assigner import ATSSAssigner
 from yolov6.assigners.tal_assigner import TaskAlignedAssigner
 
@@ -20,13 +21,14 @@ class ComputeLoss:
                  grid_cell_offset=0.5,
                  num_classes=80,
                  ori_img_size=640,
-                 warmup_epoch=4,
+                 # warmup_epoch=4,
+                 warmup_epoch=0,
                  use_dfl=True,
                  reg_max=16,
                  iou_type='giou',
                  loss_weight={
                      'class': 1.0,
-                     'iou': 2.5,
+                     'l1': 2.5,
                      'dfl': 0.5}
                  ):
         
@@ -44,9 +46,12 @@ class ComputeLoss:
         self.reg_max = reg_max
         self.proj = nn.Parameter(torch.linspace(0, self.reg_max, self.reg_max + 1), requires_grad=False)
         self.iou_type = iou_type
-        self.varifocal_loss = VarifocalLoss().cuda()
-        self.bbox_loss = BboxLoss(self.num_classes, self.reg_max, self.use_dfl, self.iou_type).cuda()
-        self.loss_weight = loss_weight       
+        self.varifocal_loss = VarifocalLoss()
+        # self.varifocal_loss = VarifocalLoss().cuda()
+        # self.bbox_loss = BboxLoss(self.num_classes, self.reg_max, self.use_dfl, self.iou_type)
+        self.l1_loss=L1Loss(self.num_classes, self.reg_max, self.use_dfl)
+        # self.bbox_loss = BboxLoss(self.num_classes, self.reg_max, self.use_dfl, self.iou_type).cuda()
+        self.loss_weight = loss_weight
         
     def __call__(
         self,
@@ -60,7 +65,7 @@ class ComputeLoss:
                generate_anchors(feats, self.fpn_strides, self.grid_cell_size, self.grid_cell_offset, device=feats[0].device)
    
         assert pred_scores.type() == pred_distri.type()
-        gt_bboxes_scale = torch.full((1,4), self.ori_img_size).type_as(pred_scores)
+        gt_bboxes_scale = torch.full((1,8), self.ori_img_size).type_as(pred_scores)
         batch_size = pred_scores.shape[0]
 
         # targets
@@ -104,32 +109,36 @@ class ComputeLoss:
         loss_cls /= target_scores_sum
         
         # bbox loss
-        loss_iou, loss_dfl = self.bbox_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes, 
+
+        # loss_iou, loss_dfl = self.bbox_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
+        #                                     target_scores, target_scores_sum, fg_mask)
+
+        loss_l1, loss_dfl = self.l1_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
                                             target_scores, target_scores_sum, fg_mask)
         
         loss = self.loss_weight['class'] * loss_cls + \
-               self.loss_weight['iou'] * loss_iou + \
+               self.loss_weight['l1'] * loss_l1 + \
                self.loss_weight['dfl'] * loss_dfl
        
         return loss, \
-            torch.cat(((self.loss_weight['iou'] * loss_iou).unsqueeze(0), 
+            torch.cat(((self.loss_weight['l1'] * loss_l1).unsqueeze(0),
                          (self.loss_weight['dfl'] * loss_dfl).unsqueeze(0),
                          (self.loss_weight['class'] * loss_cls).unsqueeze(0))).detach()
      
     def preprocess(self, targets, batch_size, scale_tensor):
-        targets_list = np.zeros((batch_size, 1, 5)).tolist() 
+        targets_list = np.zeros((batch_size, 1, 9)).tolist()
         for i, item in enumerate(targets.cpu().numpy().tolist()):
             targets_list[int(item[0])].append(item[1:])
         max_len = max((len(l) for l in targets_list))
-        targets = torch.from_numpy(np.array(list(map(lambda l:l + [[-1,0,0,0,0]]*(max_len - len(l)), targets_list)))[:,1:,:]).to(targets.device)
-        batch_target = targets[:, :, 1:5].mul_(scale_tensor)
-        targets[..., 1:] = xywh2xyxy(batch_target)
+        targets = torch.from_numpy(np.array(list(map(lambda l:l + [[-1,0,0,0,0,0,0,0,0]]*(max_len - len(l)), targets_list)))[:,1:,:]).to(targets.device)
+        batch_target = targets[:, :, 1:9].mul_(scale_tensor)
+        targets[..., 1:] = batch_target
         return targets
         
     def bbox_decode(self, anchor_points, pred_dist):
         if self.use_dfl:
             batch_size, n_anchors, _ = pred_dist.shape
-            pred_dist = F.softmax(pred_dist.view(batch_size, n_anchors, 4, self.reg_max + 1), dim=-1).matmul(self.proj.to(pred_dist.device))
+            pred_dist = F.softmax(pred_dist.view(batch_size, n_anchors, 8, self.reg_max + 1), dim=-1).matmul(self.proj.to(pred_dist.device))
         return dist2bbox(pred_dist, anchor_points)
 
 
@@ -146,32 +155,32 @@ class VarifocalLoss(nn.Module):
         return loss
 
 
-class BboxLoss(nn.Module):
-    def __init__(self, num_classes, reg_max, use_dfl=False, iou_type='giou'):
-        super(BboxLoss, self).__init__()
+class L1Loss(nn.Module):
+    def __init__(self, num_classes, reg_max, use_dfl=False):
+        super(L1Loss, self).__init__()
         self.num_classes = num_classes
-        self.iou_loss = IOUloss(box_format='xyxy', iou_type=iou_type, eps=1e-10)
+        self.l1loss = l1loss()
         self.reg_max = reg_max
         self.use_dfl = use_dfl
 
     def forward(self, pred_dist, pred_bboxes, anchor_points,
                 target_bboxes, target_scores, target_scores_sum, fg_mask):
-        
+
         # select positive samples mask
         num_pos = fg_mask.sum()
         if num_pos > 0:
-            # iou loss
-            bbox_mask = fg_mask.unsqueeze(-1).repeat([1, 1, 4])
+            # l1 loss
+            bbox_mask = fg_mask.unsqueeze(-1).repeat([1, 1, 8])
             pred_bboxes_pos = torch.masked_select(pred_bboxes,
-                                                  bbox_mask).reshape([-1, 4])
+                                                  bbox_mask).reshape([-1, 8])
             target_bboxes_pos = torch.masked_select(
-                target_bboxes, bbox_mask).reshape([-1, 4])
+                target_bboxes, bbox_mask).reshape([-1, 8])
             bbox_weight = torch.masked_select(
                 target_scores.sum(-1), fg_mask).unsqueeze(-1)
-            loss_iou = self.iou_loss(pred_bboxes_pos,
+            loss_l1 = self.l1loss(pred_bboxes_pos,
                                      target_bboxes_pos) * bbox_weight
-            loss_iou = loss_iou.sum() / target_scores_sum
-            
+            loss_l1 = loss_l1.sum() / target_scores_sum
+
             # dfl loss
             if self.use_dfl:
                 dist_mask = fg_mask.unsqueeze(-1).repeat(
@@ -182,27 +191,80 @@ class BboxLoss(nn.Module):
                 target_ltrb_pos = torch.masked_select(
                     target_ltrb, bbox_mask).reshape([-1, 4])
                 loss_dfl = self._df_loss(pred_dist_pos,
-                                        target_ltrb_pos) * bbox_weight
+                                         target_ltrb_pos) * bbox_weight
                 loss_dfl = loss_dfl.sum() / target_scores_sum
             else:
                 loss_dfl = torch.tensor(0.).to(pred_dist.device)
 
         else:
-            loss_iou = torch.tensor(0.).to(pred_dist.device)
+            loss_l1 = torch.tensor(0.).to(pred_dist.device)
             loss_dfl = torch.tensor(0.).to(pred_dist.device)
 
-        return loss_iou, loss_dfl
+        return loss_l1, loss_dfl
 
-    def _df_loss(self, pred_dist, target):
-        target_left = target.to(torch.long)
-        target_right = target_left + 1
-        weight_left = target_right.to(torch.float) - target
-        weight_right = 1 - weight_left
-        loss_left = F.cross_entropy(
-            pred_dist.view(-1, self.reg_max + 1), target_left.view(-1), reduction='none').view(
-            target_left.shape) * weight_left
-        loss_right = F.cross_entropy(
-            pred_dist.view(-1, self.reg_max + 1), target_right.view(-1), reduction='none').view(
-            target_left.shape) * weight_right
-        return (loss_left + loss_right).mean(-1, keepdim=True)
 
+
+# class BboxLoss(nn.Module):
+#     def __init__(self, num_classes, reg_max, use_dfl=False, iou_type='giou'):
+#         super(BboxLoss, self).__init__()
+#         self.num_classes = num_classes
+#         self.iou_loss = IOUloss(box_format='xyxy', iou_type=iou_type, eps=1e-10)
+#         self.reg_max = reg_max
+#         self.use_dfl = use_dfl
+#
+#     def forward(self, pred_dist, pred_bboxes, anchor_points,
+#                 target_bboxes, target_scores, target_scores_sum, fg_mask):
+#
+#         # select positive samples mask
+#         num_pos = fg_mask.sum()
+#         if num_pos > 0:
+#             # iou loss
+#             bbox_mask = fg_mask.unsqueeze(-1).repeat([1, 1, 8]) #candidates mask
+#             pred_bboxes_pos = torch.masked_select(pred_bboxes,
+#                                                   bbox_mask).reshape([-1, 8]) # pred box
+#             target_bboxes_pos = torch.masked_select(
+#                 target_bboxes, bbox_mask).reshape([-1, 8]) # target box
+#
+#             bbox_weight = torch.masked_select(
+#                 target_scores.sum(-1), fg_mask).unsqueeze(-1)
+#
+#             loss_l1=self
+#
+#             loss_iou = self.iou_loss(pred_bboxes_pos,
+#                                      target_bboxes_pos) * bbox_weight
+#             loss_iou = loss_iou.sum() / target_scores_sum
+#
+#             # dfl loss
+#             if self.use_dfl:
+#                 dist_mask = fg_mask.unsqueeze(-1).repeat(
+#                     [1, 1, (self.reg_max + 1) * 4])
+#                 pred_dist_pos = torch.masked_select(
+#                     pred_dist, dist_mask).reshape([-1, 4, self.reg_max + 1])
+#                 target_ltrb = bbox2dist(anchor_points, target_bboxes, self.reg_max)
+#                 target_ltrb_pos = torch.masked_select(
+#                     target_ltrb, bbox_mask).reshape([-1, 4])
+#                 loss_dfl = self._df_loss(pred_dist_pos,
+#                                         target_ltrb_pos) * bbox_weight
+#                 loss_dfl = loss_dfl.sum() / target_scores_sum
+#             else:
+#                 loss_dfl = torch.tensor(0.).to(pred_dist.device)
+#
+#         else:
+#             loss_iou = torch.tensor(0.).to(pred_dist.device)
+#             loss_dfl = torch.tensor(0.).to(pred_dist.device)
+#
+#         return loss_iou, loss_dfl
+#
+#     def _df_loss(self, pred_dist, target):
+#         target_left = target.to(torch.long)
+#         target_right = target_left + 1
+#         weight_left = target_right.to(torch.float) - target
+#         weight_right = 1 - weight_left
+#         loss_left = F.cross_entropy(
+#             pred_dist.view(-1, self.reg_max + 1), target_left.view(-1), reduction='none').view(
+#             target_left.shape) * weight_left
+#         loss_right = F.cross_entropy(
+#             pred_dist.view(-1, self.reg_max + 1), target_right.view(-1), reduction='none').view(
+#             target_left.shape) * weight_right
+#         return (loss_left + loss_right).mean(-1, keepdim=True)
+#

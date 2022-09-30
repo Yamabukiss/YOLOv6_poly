@@ -173,10 +173,14 @@ def mosaic_augmentation(img_size, imgs, hs, ws, labels, hyp):
         labels_per_img = labels[i].copy()
         if labels_per_img.size:
             boxes = np.copy(labels_per_img[:, 1:])
-            boxes[:, 0] = w * (labels_per_img[:, 1] - labels_per_img[:, 3] / 2) + padw  # top left x
-            boxes[:, 1] = h * (labels_per_img[:, 2] - labels_per_img[:, 4] / 2) + padh  # top left y
-            boxes[:, 2] = w * (labels_per_img[:, 1] + labels_per_img[:, 3] / 2) + padw  # bottom right x
-            boxes[:, 3] = h * (labels_per_img[:, 2] + labels_per_img[:, 4] / 2) + padh  # bottom right y
+            boxes[:, 0] = w * labels_per_img[:, 1] + padw
+            boxes[:, 1] = h * labels_per_img[:, 2] + padh
+            boxes[:, 2] = w * labels_per_img[:, 3] + padw
+            boxes[:, 3] = h * labels_per_img[:, 4] + padh
+            boxes[:, 4] = w * labels_per_img[:, 5] + padw
+            boxes[:, 5] = h * labels_per_img[:, 6] + padh
+            boxes[:, 6] = w * labels_per_img[:, 7] + padw
+            boxes[:, 7] = h * labels_per_img[:, 8] + padh
             labels_per_img[:, 1:] = boxes
 
         labels4.append(labels_per_img)

@@ -60,10 +60,12 @@ class Trainer:
             self.optimizer = self.get_optimizer(args, cfg, model)
         self.scheduler, self.lf = self.get_lr_scheduler(args, cfg, self.optimizer)
         self.ema = ModelEMA(model) if self.main_process else None
+
         # tensorboard
         self.tblogger = SummaryWriter(self.save_dir) if self.main_process else None
         self.start_epoch = 0
         #resume
+
         if hasattr(self, "ckpt"):
             resume_state_dict = self.ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
             model.load_state_dict(resume_state_dict, strict=True)  # load
@@ -193,7 +195,8 @@ class Trainer:
                             batch_size=self.batch_size // self.world_size * 2,
                             img_size=self.img_size,
                             model=self.ema.ema if self.args.calib is False else self.model,
-                            conf_thres=0.03,
+                            conf_thres=0.01,
+                            iou_thres=0.3,
                             dataloader=self.val_loader,
                             save_dir=self.save_dir,
                             task='train')
@@ -260,8 +263,11 @@ class Trainer:
                                                             )
 
     def prepare_for_steps(self):
+        self.cfg.data_aug.mosaic = 0.0  #想关闭数据增强就解注释这里
+        self.cfg.data_aug.mixup = 0.0
         if self.epoch > self.start_epoch:
             self.scheduler.step()
+
         #stop strong aug like mosaic and mixup from last n epoch by recreate dataloader
         if self.epoch == self.max_epoch - self.args.stop_aug_last_n_epoch:
             self.cfg.data_aug.mosaic = 0.0
@@ -467,17 +473,25 @@ class Trainer:
             vis_output_array = vis_output.cpu().numpy()     # xyxy
             ori_img = cv2.imread(vis_path)
             for bbox_idx, vis_bbox in enumerate(vis_output_array):
-                x_tl = int(vis_bbox[0])
-                y_tl = int(vis_bbox[1])
-                x_br = int(vis_bbox[2])
-                y_br = int(vis_bbox[3])
-                box_score = vis_bbox[4]
-                cls_id = int(vis_bbox[5])
+                x1=int(vis_bbox[0])
+                y1=int(vis_bbox[1])
+                x2=int(vis_bbox[2])
+                y2=int(vis_bbox[3])
+                x3=int(vis_bbox[4])
+                y3=int(vis_bbox[5])
+                x4=int(vis_bbox[6])
+                y4=int(vis_bbox[7])
+                box_score = vis_bbox[8]
+                cls_id = int(vis_bbox[9])
                 # draw top n bbox
                 if box_score < vis_conf or bbox_idx > vis_max_box_num:
                     break
-                cv2.rectangle(ori_img, (x_tl, y_tl), (x_br, y_br), tuple([int(x) for x in self.color[cls_id]]), thickness=1)
-                cv2.putText(ori_img, f"{self.data_dict['names'][cls_id]}: {box_score:.2f}", (x_tl, y_tl - 10), cv2.FONT_HERSHEY_COMPLEX, 0.5, tuple([int(x) for x in self.color[cls_id]]), thickness=1)
+                # cv2.rectangle(ori_img, (x_tl, y_tl), (x_br, y_br), tuple([int(x) for x in self.color[cls_id]]), thickness=1)
+                cv2.line(ori_img,(x1,y1),(x2,y2),tuple([int(x) for x in self.color[cls_id]]), thickness=1)
+                cv2.line(ori_img,(x2,y2),(x3,y3),tuple([int(x) for x in self.color[cls_id]]), thickness=1)
+                cv2.line(ori_img,(x3,y3),(x4,y4),tuple([int(x) for x in self.color[cls_id]]), thickness=1)
+                cv2.line(ori_img,(x4,y4),(x1,y1),tuple([int(x) for x in self.color[cls_id]]), thickness=1)
+                cv2.putText(ori_img, f"{self.data_dict['names'][cls_id]}: {box_score:.2f}", (x1,y1-5), cv2.FONT_HERSHEY_COMPLEX, 0.5, tuple([int(x) for x in self.color[cls_id]]), thickness=1)
             self.vis_imgs_list.append(torch.from_numpy(ori_img[:, :, ::-1].copy()))
 
 

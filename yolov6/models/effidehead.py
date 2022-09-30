@@ -112,12 +112,12 @@ class Detect(nn.Module):
                 reg_output = self.reg_preds[i](reg_feat)
                 
                 if self.use_dfl:
-                    reg_output = reg_output.reshape([-1, 4, self.reg_max + 1, l]).permute(0, 2, 1, 3)
+                    reg_output = reg_output.reshape([-1, 8, self.reg_max + 1, l]).permute(0, 2, 1, 3)
                     reg_output = self.proj_conv(F.softmax(reg_output, dim=1))
                 
                 cls_output = torch.sigmoid(cls_output)
                 cls_score_list.append(cls_output.reshape([b, self.nc, l]))
-                reg_dist_list.append(reg_output.reshape([b, 4, l]))
+                reg_dist_list.append(reg_output.reshape([b, 8, l]))
             
             cls_score_list = torch.cat(cls_score_list, axis=-1).permute(0, 2, 1)
             reg_dist_list = torch.cat(reg_dist_list, axis=-1).permute(0, 2, 1)
@@ -166,7 +166,7 @@ def build_effidehead_layer(channels_list, num_anchors, num_classes, reg_max=16):
         # reg_pred0
         nn.Conv2d(
             in_channels=channels_list[6],
-            out_channels=4 * (reg_max + num_anchors),
+            out_channels=8 * (reg_max + num_anchors),
             kernel_size=1
         ),
         # stem1
@@ -199,7 +199,7 @@ def build_effidehead_layer(channels_list, num_anchors, num_classes, reg_max=16):
         # reg_pred1
         nn.Conv2d(
             in_channels=channels_list[8],
-            out_channels=4 * (reg_max + num_anchors),
+            out_channels=8 * (reg_max + num_anchors),
             kernel_size=1
         ),
         # stem2
@@ -232,7 +232,7 @@ def build_effidehead_layer(channels_list, num_anchors, num_classes, reg_max=16):
         # reg_pred2
         nn.Conv2d(
             in_channels=channels_list[10],
-            out_channels=4 * (reg_max + num_anchors),
+            out_channels=8 * (reg_max + num_anchors),
             kernel_size=1
         )
     )

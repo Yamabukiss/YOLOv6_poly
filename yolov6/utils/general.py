@@ -28,15 +28,22 @@ def find_latest_checkpoint(search_dir='.'):
 
 def dist2bbox(distance, anchor_points, box_format='xyxy'):
     '''Transform distance(ltrb) to box(xywh or xyxy).'''
-    lt, rb = torch.split(distance, 2, -1)
-    x1y1 = anchor_points - lt
-    x2y2 = anchor_points + rb
-    if box_format == 'xyxy':
-        bbox = torch.cat([x1y1, x2y2], -1)
-    elif box_format == 'xywh':
-        c_xy = (x1y1 + x2y2) / 2
-        wh = x2y2 - x1y1
-        bbox = torch.cat([c_xy, wh], -1)
+    point_list = torch.split(distance, 2, -1)
+    p1=point_list[0]
+    p2=point_list[1]
+    p3=point_list[2]
+    p4=point_list[3]
+    p1 = anchor_points - p1
+    p2 = anchor_points + p2
+    p3 = anchor_points + p3
+    p4 = anchor_points - p4
+    # if box_format == 'xyxy':
+    #     bbox = torch.cat([x1y1, x2y2], -1)
+    # elif box_format == 'xywh':
+    #     c_xy = (x1y1 + x2y2) / 2
+    #     wh = x2y2 - x1y1
+    #     bbox = torch.cat([c_xy, wh], -1)
+    bbox = torch.cat([p1,p2,p3,p4], -1)
     return bbox
 
 

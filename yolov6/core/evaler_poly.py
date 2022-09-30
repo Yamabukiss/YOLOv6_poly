@@ -88,14 +88,15 @@ class Evaler:
         if task != 'train':
             pad = 0.0 if task == 'speed' else 0.5
             eval_hyp = {
-                "test_load_size":self.test_load_size,
-                "letterbox_return_int":self.letterbox_return_int,
+                "test_load_size": self.test_load_size,
+                "letterbox_return_int": self.letterbox_return_int,
             }
             if self.force_no_pad:
                 pad = 0.0
             rect = not self.not_infer_on_rect
             dataloader = create_dataloader(self.data[task if task in ('train', 'val', 'test') else 'val'],
-                                           self.img_size, self.batch_size, self.stride, hyp=eval_hyp, check_labels=True, pad=pad, rect=rect,
+                                           self.img_size, self.batch_size, self.stride, hyp=eval_hyp, check_labels=True,
+                                           pad=pad, rect=rect,
                                            data_dict=self.data, task=task)[0]
         return dataloader
 
@@ -140,7 +141,7 @@ class Evaler:
             if self.do_pr_metric:
                 import copy
                 eval_outputs = copy.deepcopy([x.detach().cpu() for x in outputs])
-            
+
             # save result
             pred_results.extend(self.convert_to_coco_format(outputs, imgs, paths, shapes, self.ids))
 
@@ -149,7 +150,7 @@ class Evaler:
                 vis_num = min(len(imgs), 8)
                 vis_outputs = outputs[:vis_num]
                 vis_paths = paths[:vis_num]
-            
+
             if not self.do_pr_metric:
                 continue
 
@@ -174,7 +175,7 @@ class Evaler:
                 # Assign all predictions as incorrect
                 correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
                 if nl:
-                    
+
                     from yolov6.utils.nms import xywh2xyxy
 
                     # target boxes
@@ -185,7 +186,7 @@ class Evaler:
                     self.scale_coords(imgs[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
 
                     labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
-                    
+
                     from yolov6.utils.metrics import process_batch
 
                     correct = process_batch(predn, labelsn, iouv)
@@ -194,22 +195,24 @@ class Evaler:
 
                 # Append statistics (correct, conf, pcls, tcls)
                 stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
-        
+
         if self.do_pr_metric:
             # Compute statistics
             stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
             if len(stats) and stats[0].any():
 
                 from yolov6.utils.metrics import ap_per_class
-                p, r, ap, f1, ap_class = ap_per_class(*stats, plot=self.plot_curve, save_dir=self.save_dir, names=model.names)
-                AP50_F1_max_idx = len(f1.mean(0)) - f1.mean(0)[::-1].argmax() -1
-                LOGGER.info(f"IOU 50 best mF1 thershold near {AP50_F1_max_idx/1000.0}.")
+                p, r, ap, f1, ap_class = ap_per_class(*stats, plot=self.plot_curve, save_dir=self.save_dir,
+                                                      names=model.names)
+                AP50_F1_max_idx = len(f1.mean(0)) - f1.mean(0)[::-1].argmax() - 1
+                LOGGER.info(f"IOU 50 best mF1 thershold near {AP50_F1_max_idx / 1000.0}.")
                 ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
                 mp, mr, map50, map = p[:, AP50_F1_max_idx].mean(), r[:, AP50_F1_max_idx].mean(), ap50.mean(), ap.mean()
                 nt = np.bincount(stats[3].astype(np.int64), minlength=model.nc)  # number of targets per class
-                
+
                 # Print results
-                s = ('%-16s' + '%12s' * 7) % ('Class', 'Images', 'Labels', 'P@.5iou', 'R@.5iou', 'F1@.5iou', 'mAP@.5', 'mAP@.5:.95')
+                s = ('%-16s' + '%12s' * 7) % (
+                'Class', 'Images', 'Labels', 'P@.5iou', 'R@.5iou', 'F1@.5iou', 'mAP@.5', 'mAP@.5:.95')
                 LOGGER.info(s)
                 pf = '%-16s' + '%12i' * 2 + '%12.3g' * 5  # print format
                 LOGGER.info(pf % ('all', seen, nt.sum(), mp, mr, f1.mean(0)[AP50_F1_max_idx], map50, map))
@@ -219,17 +222,16 @@ class Evaler:
                 # Print results per class
                 if self.verbose and model.nc > 1:
                     for i, c in enumerate(ap_class):
-                        LOGGER.info(pf % (model.names[c], seen, nt[c], p[i, AP50_F1_max_idx], r[i, AP50_F1_max_idx], 
-                                           f1[i, AP50_F1_max_idx], ap50[i], ap[i]))
-                
+                        LOGGER.info(pf % (model.names[c], seen, nt[c], p[i, AP50_F1_max_idx], r[i, AP50_F1_max_idx],
+                                          f1[i, AP50_F1_max_idx], ap50[i], ap[i]))
+
                 if self.plot_confusion_matrix:
                     confusion_matrix.plot(save_dir=self.save_dir, names=list(model.names))
             else:
                 LOGGER.info("Calculate metric failed, might check dataset.")
                 self.pr_metric_result = (0.0, 0.0)
-        
+
         return pred_results, vis_outputs, vis_paths
-        
 
     def eval_model(self, pred_results, model, dataloader, task):
         '''Evaluate models
@@ -262,56 +264,61 @@ class Evaler:
             cocoEval = COCOeval(anno, pred, 'bbox')
             if self.is_coco:
                 imgIds = [int(os.path.basename(x).split(".")[0])
-                            for x in dataloader.dataset.img_paths]
+                          for x in dataloader.dataset.img_paths]
                 cocoEval.params.imgIds = imgIds
-            cocoEval.evaluate()
+            cocoEval.evaluate_poly()
             cocoEval.accumulate()
 
-            #print each class ap from pycocotool result
+            # print each class ap from pycocotool result
             if self.verbose:
-                
+
                 import copy
                 val_dataset_img_count = cocoEval.cocoGt.imgToAnns.__len__()
                 val_dataset_anns_count = 0
-                label_count_dict = {"images":set(), "anns":0}
+                label_count_dict = {"images": set(), "anns": 0}
                 label_count_dicts = [copy.deepcopy(label_count_dict) for _ in range(model.nc)]
                 for _, ann_i in cocoEval.cocoGt.anns.items():
                     if ann_i["ignore"]:
                         continue
                     val_dataset_anns_count += 1
-                    nc_i = self.coco80_to_coco91_class().index(ann_i['category_id']) if self.is_coco else ann_i['category_id']
+                    nc_i = self.coco80_to_coco91_class().index(ann_i['category_id']) if self.is_coco else ann_i[
+                        'category_id']
                     label_count_dicts[nc_i]["images"].add(ann_i["image_id"])
                     label_count_dicts[nc_i]["anns"] += 1
-                
-                s = ('%-16s' + '%12s' * 7) % ('Class', 'Labeled_images', 'Labels', 'P@.5iou', 'R@.5iou', 'F1@.5iou', 'mAP@.5', 'mAP@.5:.95')
+
+                s = ('%-16s' + '%12s' * 7) % (
+                'Class', 'Labeled_images', 'Labels', 'P@.5iou', 'R@.5iou', 'F1@.5iou', 'mAP@.5', 'mAP@.5:.95')
                 LOGGER.info(s)
-                #IOU , all p, all cats, all gt, maxdet 100
+                # IOU , all p, all cats, all gt, maxdet 100
                 coco_p = cocoEval.eval['precision']
                 coco_p_all = coco_p[:, :, :, 0, 2]
-                map = np.mean(coco_p_all[coco_p_all>-1])
+                map = np.mean(coco_p_all[coco_p_all > -1])
 
                 coco_p_iou50 = coco_p[0, :, :, 0, 2]
-                map50 = np.mean(coco_p_iou50[coco_p_iou50>-1])
-                mp = np.array([np.mean(coco_p_iou50[ii][coco_p_iou50[ii]>-1]) for ii in range(coco_p_iou50.shape[0])])
+                map50 = np.mean(coco_p_iou50[coco_p_iou50 > -1])
+                mp = np.array([np.mean(coco_p_iou50[ii][coco_p_iou50[ii] > -1]) for ii in range(coco_p_iou50.shape[0])])
                 mr = np.linspace(.0, 1.00, int(np.round((1.00 - .0) / .01)) + 1, endpoint=True)
                 mf1 = 2 * mp * mr / (mp + mr + 1e-16)
                 i = mf1.argmax()  # max F1 index
 
                 pf = '%-16s' + '%12i' * 2 + '%12.3g' * 5  # print format
-                LOGGER.info(pf % ('all', val_dataset_img_count, val_dataset_anns_count, mp[i], mr[i], mf1[i], map50, map))
-                
-                #compute each class best f1 and corresponding p and r
+                LOGGER.info(
+                    pf % ('all', val_dataset_img_count, val_dataset_anns_count, mp[i], mr[i], mf1[i], map50, map))
+
+                # compute each class best f1 and corresponding p and r
                 for nc_i in range(model.nc):
                     coco_p_c = coco_p[:, :, nc_i, 0, 2]
-                    map = np.mean(coco_p_c[coco_p_c>-1])
+                    map = np.mean(coco_p_c[coco_p_c > -1])
 
                     coco_p_c_iou50 = coco_p[0, :, nc_i, 0, 2]
-                    map50 = np.mean(coco_p_c_iou50[coco_p_c_iou50>-1])
+                    map50 = np.mean(coco_p_c_iou50[coco_p_c_iou50 > -1])
                     p = coco_p_c_iou50
                     r = np.linspace(.0, 1.00, int(np.round((1.00 - .0) / .01)) + 1, endpoint=True)
                     f1 = 2 * p * r / (p + r + 1e-16)
                     i = f1.argmax()
-                    LOGGER.info(pf % (model.names[nc_i], len(label_count_dicts[nc_i]["images"]), label_count_dicts[nc_i]["anns"], p[i], r[i], f1[i], map50, map))
+                    LOGGER.info(pf % (
+                    model.names[nc_i], len(label_count_dicts[nc_i]["images"]), label_count_dicts[nc_i]["anns"], p[i],
+                    r[i], f1[i], map50, map))
             cocoEval.summarize()
             map, map50 = cocoEval.stats[:2]  # update results (mAP@0.5:0.95, mAP@0.5)
             # Return results
@@ -326,7 +333,7 @@ class Evaler:
         if task != 'train':
             n_samples = self.speed_result[0].item()
             pre_time, inf_time, nms_time = 1000 * self.speed_result[1:].cpu().numpy() / n_samples
-            for n, v in zip(["pre-process", "inference", "NMS"],[pre_time, inf_time, nms_time]):
+            for n, v in zip(["pre-process", "inference", "NMS"], [pre_time, inf_time, nms_time]):
                 LOGGER.info("Average {} time: {:.2f} ms".format(n, v))
 
     def box_convert(self, x):
@@ -403,11 +410,14 @@ class Evaler:
         if task != 'train':
             if task == 'val' or task == 'test':
                 if conf_thres > 0.03:
-                    LOGGER.warning(f'The best conf_thresh when evaluate the model is less than 0.03, while you set it to: {conf_thres}')
+                    LOGGER.warning(
+                        f'The best conf_thresh when evaluate the model is less than 0.03, while you set it to: {conf_thres}')
                 if iou_thres != 0.65:
-                    LOGGER.warning(f'The best iou_thresh when evaluate the model is 0.65, while you set it to: {iou_thres}')
+                    LOGGER.warning(
+                        f'The best iou_thresh when evaluate the model is 0.65, while you set it to: {iou_thres}')
             if task == 'speed' and conf_thres < 0.4:
-                LOGGER.warning(f'The best conf_thresh when test the speed of the model is larger than 0.4, while you set it to: {conf_thres}')
+                LOGGER.warning(
+                    f'The best conf_thresh when test the speed of the model is larger than 0.4, while you set it to: {conf_thres}')
 
     @staticmethod
     def reload_device(device, model, task):
@@ -436,19 +446,20 @@ class Evaler:
 
     @staticmethod
     def coco80_to_coco91_class():  # converts 80-index (val2014) to 91-index (paper)
-    # https://tech.amikelive.com/node-718/what-object-categories-labels-are-in-coco-dataset/
+        # https://tech.amikelive.com/node-718/what-object-categories-labels-are-in-coco-dataset/
         x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20,
-            21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-            41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
-            59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79,
-            80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
+             21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+             41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
+             59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79,
+             80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
         return x
 
     def eval_trt(self, engine, stride=32):
         self.stride = stride
+
         def init_engine(engine):
             import tensorrt as trt
-            from collections import namedtuple,OrderedDict
+            from collections import namedtuple, OrderedDict
             Binding = namedtuple('Binding', ('name', 'dtype', 'shape', 'data', 'ptr'))
             logger = trt.Logger(trt.Logger.ERROR)
             trt.init_libnvinfer_plugins(logger, namespace="")
@@ -470,7 +481,8 @@ class Evaler:
             self.ids = self.coco80_to_coco91_class() if self.is_coco else list(range(1000))
             pad = 0.0 if task == 'speed' else 0.5
             dataloader = create_dataloader(self.data[task if task in ('train', 'val', 'test') else 'val'],
-                                           self.img_size, self.batch_size, self.stride, check_labels=True, pad=pad, rect=False,
+                                           self.img_size, self.batch_size, self.stride, check_labels=True, pad=pad,
+                                           rect=False,
                                            data_dict=self.data, task=task)[0]
             return dataloader
 
@@ -482,7 +494,7 @@ class Evaler:
                     continue
                 path, shape = Path(paths[i]), shapes[i][0]
                 gain = shapes[i][1][0][0]
-                pad = torch.tensor(shapes[i][1][1]*2).to(self.device)
+                pad = torch.tensor(shapes[i][1][1] * 2).to(self.device)
                 detbox = detbox[:n, :]
                 detbox -= pad
                 detbox /= gain
@@ -490,7 +502,7 @@ class Evaler:
                 detbox[:, 1].clamp_(0, shape[0])
                 detbox[:, 2].clamp_(0, shape[1])
                 detbox[:, 3].clamp_(0, shape[0])
-                detbox[:,2:] = detbox[:,2:] - detbox[:,:2]
+                detbox[:, 2:] = detbox[:, 2:] - detbox[:, :2]
                 detscore = detscore[:n]
                 detcls = detcls[:n]
 
@@ -516,7 +528,7 @@ class Evaler:
         for _ in range(10):
             binding_addrs['images'] = int(tmp.data_ptr())
             context.execute_v2(list(binding_addrs.values()))
-        dataloader = init_data(None,'val')
+        dataloader = init_data(None, 'val')
         self.speed_result = torch.zeros(4, device=self.device)
         pred_results = []
         pbar = tqdm(dataloader, desc="Inferencing model in validation dataset.", ncols=NCOLS)
@@ -525,7 +537,7 @@ class Evaler:
             if nb_img != self.batch_size:
                 # pad to tensorrt model setted batch size
                 zeros = torch.zeros(self.batch_size - nb_img, 3, *imgs.shape[2:])
-                imgs = torch.cat([imgs, zeros],0)
+                imgs = torch.cat([imgs, zeros], 0)
             t1 = time_sync()
             imgs = imgs.to(self.device, non_blocking=True)
             # preprocess

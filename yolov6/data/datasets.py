@@ -89,85 +89,104 @@ class TrainValDataset(Dataset):
         During validation, letterbox augment is applied.
         """
         # Mosaic Augmentation
-        if self.augment and random.random() < self.hyp["mosaic"]:
-            img, labels = self.get_mosaic(index)
-            shapes = None
+        # if self.augment and random.random() < self.hyp["mosaic"]:
+        #     img, labels = self.get_mosaic(index)
+        #     shapes = None
 
             # MixUp augmentation
-            if random.random() < self.hyp["mixup"]:
-                img_other, labels_other = self.get_mosaic(
-                    random.randint(0, len(self.img_paths) - 1)
-                )
-                img, labels = mixup(img, labels, img_other, labels_other)
+            # if random.random() < self.hyp["mixup"]:
+            #     img_other, labels_other = self.get_mosaic(
+            #         random.randint(0, len(self.img_paths) - 1)
+            #     )
+            #     img, labels = mixup(img, labels, img_other, labels_other)
 
-        else:
+        # else:
             # Load image
-            if self.hyp and "test_load_size" in self.hyp:
-                img, (h0, w0), (h, w) = self.load_image(index, self.hyp["test_load_size"])
-            else:
-                img, (h0, w0), (h, w) = self.load_image(index)
+        if self.hyp and "test_load_size" in self.hyp:
+            img, (h0, w0), (h, w) = self.load_image(index, self.hyp["test_load_size"])
+        else:
+            img, (h0, w0), (h, w) = self.load_image(index)
 
-            # Letterbox
-            shape = (
-                self.batch_shapes[self.batch_indices[index]]
-                if self.rect
-                else self.img_size
-            )  # final letterboxed shape
-            if self.hyp and "letterbox_return_int" in self.hyp:
-                img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment, return_int=self.hyp["letterbox_return_int"])
-            else:
-                img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment)
-                  
-            shapes = (h0, w0), ((h * ratio / h0, w * ratio / w0), pad)  # for COCO mAP rescaling
+        # Letterbox
+        shape = (
+            self.batch_shapes[self.batch_indices[index]]
+            if self.rect
+            else self.img_size
+        )  # final letterboxed shape
+        if self.hyp and "letterbox_return_int" in self.hyp:
+            img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment, return_int=self.hyp["letterbox_return_int"])
+        else:
+            img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment)
 
-            labels = self.labels[index].copy()
-            if labels.size:
-                w *= ratio
-                h *= ratio
-                # new boxes
-                boxes = np.copy(labels[:, 1:])
-                boxes[:, 0] = (
-                    w * (labels[:, 1] - labels[:, 3] / 2) + pad[0]
-                )  # top left x
-                boxes[:, 1] = (
-                    h * (labels[:, 2] - labels[:, 4] / 2) + pad[1]
-                )  # top left y
-                boxes[:, 2] = (
-                    w * (labels[:, 1] + labels[:, 3] / 2) + pad[0]
-                )  # bottom right x
-                boxes[:, 3] = (
-                    h * (labels[:, 2] + labels[:, 4] / 2) + pad[1]
-                )  # bottom right y
-                labels[:, 1:] = boxes
+        shapes = (h0, w0), ((h * ratio / h0, w * ratio / w0), pad)  # for COCO mAP rescaling
 
-            if self.augment:
-                img, labels = random_affine(
-                    img,
-                    labels,
-                    degrees=self.hyp["degrees"],
-                    translate=self.hyp["translate"],
-                    scale=self.hyp["scale"],
-                    shear=self.hyp["shear"],
-                    new_shape=(self.img_size, self.img_size),
-                )
+        labels = self.labels[index].copy()
+        # if labels.size:
+        #     w *= ratio
+        #     h *= ratio
+        #     # new boxes
+        #     boxes = np.copy(labels[:, 1:])
+        #
+        #     boxes[:, 0] = (
+        #         w * labels[:, 1] + pad[0]
+        #     )
+        #
+        #     boxes[:, 1] = (
+        #         h * labels[:, 2] + pad[1]
+        #     )
+        #
+        #     boxes[:, 2] = (
+        #         w * labels[:, 3] + pad[0]
+        #     )
+        #     boxes[:, 3] = (
+        #         h * labels[:, 4] + pad[1]
+        #     )
+        #
+        #     boxes[:, 4] = (
+        #             w * labels[:, 5] + pad[0]
+        #     )
+        #
+        #     boxes[:, 5] = (
+        #             h * labels[:, 6] + pad[1]
+        #     )
+        #
+        #     boxes[:, 6] = (
+        #             w * labels[:, 7] + pad[0]
+        #     )
+        #     boxes[:, 7] = (
+        #             h * labels[:, 8] + pad[1]
+        #     )
+        #
+        #     labels[:, 1:] = boxes
 
-        if len(labels):
-            h, w = img.shape[:2]
+        # if self.augment:
+        #     img, labels = random_affine(
+        #         img,
+        #         labels,
+        #         degrees=self.hyp["degrees"],
+        #         translate=self.hyp["translate"],
+        #         scale=self.hyp["scale"],
+        #         shear=self.hyp["shear"],
+        #         new_shape=(self.img_size, self.img_size),
+        #     )
 
-            labels[:, [1, 3]] = labels[:, [1, 3]].clip(0, w - 1e-3)  # x1, x2
-            labels[:, [2, 4]] = labels[:, [2, 4]].clip(0, h - 1e-3)  # y1, y2
+        # if len(labels):
+        #     h, w = img.shape[:2]
+        #
+        #     labels[:, [1, 3]] = labels[:, [1, 3]].clip(0, w - 1e-3)  # x1, x2
+        #     labels[:, [2, 4]] = labels[:, [2, 4]].clip(0, h - 1e-3)  # y1, y2
+        #
+        #     boxes = np.copy(labels[:, 1:])
+        #     boxes[:, 0] = ((labels[:, 1] + labels[:, 3]) / 2) / w  # x center
+        #     boxes[:, 1] = ((labels[:, 2] + labels[:, 4]) / 2) / h  # y center
+        #     boxes[:, 2] = (labels[:, 3] - labels[:, 1]) / w  # width
+        #     boxes[:, 3] = (labels[:, 4] - labels[:, 2]) / h  # height
+        #     labels[:, 1:] = boxes
 
-            boxes = np.copy(labels[:, 1:])
-            boxes[:, 0] = ((labels[:, 1] + labels[:, 3]) / 2) / w  # x center
-            boxes[:, 1] = ((labels[:, 2] + labels[:, 4]) / 2) / h  # y center
-            boxes[:, 2] = (labels[:, 3] - labels[:, 1]) / w  # width
-            boxes[:, 3] = (labels[:, 4] - labels[:, 2]) / h  # height
-            labels[:, 1:] = boxes
+        # if self.augment:
+        #     img, labels = self.general_augment(img, labels)
 
-        if self.augment:
-            img, labels = self.general_augment(img, labels)
-
-        labels_out = torch.zeros((len(labels), 6))
+        labels_out = torch.zeros((len(labels), 10))
         if len(labels):
             labels_out[:, 1:] = torch.from_numpy(labels)
 
@@ -281,6 +300,10 @@ class TrainValDataset(Dataset):
             osp.join(label_dir, _new_rel_path_with_ext(img_dir, p, ".txt"))
             for p in img_paths
         )
+
+        # label_paths=sorted(
+        #     glob.glob("D:\yolov6_self\YOLOv6\mineral\labels\\train\[0-9]*.txt")
+        # )
         assert label_paths, f"No labels found in {label_dir}."
         label_hash = self.get_hash(label_paths)
         if "label_hash" not in cache_info or cache_info["label_hash"] != label_hash:
@@ -353,7 +376,7 @@ class TrainValDataset(Dataset):
                         img_path,
                         np.array(info["labels"], dtype=np.float32)
                         if info["labels"]
-                        else np.zeros((0, 5), dtype=np.float32),
+                        else np.zeros((0, 9), dtype=np.float32),
                     )
                     for img_path, info in img_info.items()
                 ]
@@ -489,7 +512,7 @@ class TrainValDataset(Dataset):
                     labels = np.array(labels, dtype=np.float32)
                 if len(labels):
                     assert all(
-                        len(l) == 5 for l in labels
+                        len(l) == 9 for l in labels
                     ), f"{lb_path}: wrong label format."
                     assert (
                         labels >= 0
@@ -541,20 +564,16 @@ class TrainValDataset(Dataset):
             )
             if labels:
                 for label in labels:
-                    c, x, y, w, h = label[:5]
+                    c, x1, y1, x2,y2,x3,y3,x4,y4 = label[:9]
+                    rect_w=abs(int(x3-x1))
+                    rect_h=abs(int(y3-y1))
                     # convert x,y,w,h to x1,y1,x2,y2
-                    x1 = (x - w / 2) * img_w
-                    y1 = (y - h / 2) * img_h
-                    x2 = (x + w / 2) * img_w
-                    y2 = (y + h / 2) * img_h
                     # cls_id starts from 0
                     cls_id = int(c)
-                    w = max(0, x2 - x1)
-                    h = max(0, y2 - y1)
                     dataset["annotations"].append(
                         {
-                            "area": h * w,
-                            "bbox": [x1, y1, w, h],
+                            "bbox": [x1*img_w, y1*img_h, x2*img_w,y2*img_h,x3*img_w,y3*img_h,x4*img_w,y4*img_h],
+                            "area" : rect_w*img_w-rect_h*img_h,
                             "category_id": cls_id,
                             "id": ann_id,
                             "image_id": img_id,

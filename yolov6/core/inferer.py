@@ -244,7 +244,7 @@ class Inferer:
                         thickness=tf, lineType=cv2.LINE_AA)
 
     @staticmethod
-    def font_check(font='./yolov6/utils/Arial.ttf', size=10):
+    def font_check(font=r'D:\yolov6_origin\YOLOv6\yolov6\utils\Arial.ttf', size=10):
         # Return a PIL TrueType Font, downloading to CONFIG_DIR if necessary
         assert osp.exists(font), f'font path not exists: {font}'
         try:

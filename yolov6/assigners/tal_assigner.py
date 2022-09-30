@@ -55,10 +55,10 @@ class TaskAlignedAssigner(nn.Module):
         
         mask_pos, align_metric, overlaps = self.get_pos_mask(
             pd_scores, pd_bboxes, gt_labels, gt_bboxes, anc_points, mask_gt)
-
+        shit1=mask_pos.sum()
+        shit2=overlaps.sum()
         target_gt_idx, fg_mask, mask_pos = select_highest_overlaps(
             mask_pos, overlaps, self.n_max_boxes)
-        
         # assigned target
         target_labels, target_bboxes, target_scores = self.get_targets(
             gt_labels, gt_bboxes, target_gt_idx, fg_mask)
@@ -86,7 +86,7 @@ class TaskAlignedAssigner(nn.Module):
         mask_in_gts = select_candidates_in_gts(anc_points, gt_bboxes)
         # get topk_metric mask
         mask_topk = self.select_topk_candidates(
-            align_metric * mask_in_gts, topk_mask=mask_gt.repeat([1, 1, self.topk]).bool())
+            align_metric * mask_in_gts, topk_mask=mask_gt.repeat([1, 1, self.topk]).bool()) #选中了在gt里的那些anchor且乘以t
         # merge all mask to a final mask
         mask_pos = mask_topk * mask_in_gts * mask_gt
 
@@ -104,7 +104,6 @@ class TaskAlignedAssigner(nn.Module):
         ind[0] = torch.arange(end=self.bs).view(-1, 1).repeat(1, self.n_max_boxes)
         ind[1] = gt_labels.squeeze(-1)
         bbox_scores = pd_scores[ind[0], ind[1]]
-
         overlaps = iou_calculator(gt_bboxes, pd_bboxes)
         align_metric = bbox_scores.pow(self.alpha) * overlaps.pow(self.beta)
 
@@ -117,11 +116,11 @@ class TaskAlignedAssigner(nn.Module):
 
         num_anchors = metrics.shape[-1]
         topk_metrics, topk_idxs = torch.topk(
-            metrics, self.topk, axis=-1, largest=largest)
+            metrics, self.topk, axis=-1, largest=largest) # torch.topk获取其中最大的n个值
         if topk_mask is None:
             topk_mask = (topk_metrics.max(axis=-1, keepdim=True) > self.eps).tile(
                 [1, 1, self.topk])
-        topk_idxs = torch.where(topk_mask, topk_idxs, torch.zeros_like(topk_idxs))
+        topk_idxs = torch.where(topk_mask, topk_idxs, torch.zeros_like(topk_idxs)) #（约束，成立就这个，不成立就这个）
         is_in_topk = F.one_hot(topk_idxs, num_anchors).sum(axis=-2)
         is_in_topk = torch.where(is_in_topk > 1,
             torch.zeros_like(is_in_topk), is_in_topk)
@@ -139,7 +138,7 @@ class TaskAlignedAssigner(nn.Module):
         target_labels = gt_labels.long().flatten()[target_gt_idx]
 
         # assigned target boxes
-        target_bboxes = gt_bboxes.reshape([-1, 4])[target_gt_idx]
+        target_bboxes = gt_bboxes.reshape([-1, 8])[target_gt_idx]
 
         # assigned target scores       
         target_labels[target_labels<0] = 0
