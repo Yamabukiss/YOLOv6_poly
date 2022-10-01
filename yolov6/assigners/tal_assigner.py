@@ -55,8 +55,6 @@ class TaskAlignedAssigner(nn.Module):
         
         mask_pos, align_metric, overlaps = self.get_pos_mask(
             pd_scores, pd_bboxes, gt_labels, gt_bboxes, anc_points, mask_gt)
-        shit1=mask_pos.sum()
-        shit2=overlaps.sum()
         target_gt_idx, fg_mask, mask_pos = select_highest_overlaps(
             mask_pos, overlaps, self.n_max_boxes)
         # assigned target

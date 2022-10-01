@@ -152,7 +152,7 @@ def mosaic_augmentation(img_size, imgs, hs, ws, labels, hyp):
         img, h, w = imgs[i], hs[i], ws[i]
         # place img in img4
         if i == 0:  # top left
-            img4 = np.full((s * 2, s * 2, img.shape[2]), 114, dtype=np.uint8)  # base image with 4 tiles
+            img4 = np.full((s * 2, s * 2, img.shape[2]), 114, dtype=np.uint8)  # base image with 4 tiles 生成容纳四张图片的大小图
             x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc  # xmin, ymin, xmax, ymax (large image)
             x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h  # xmin, ymin, xmax, ymax (small image)
         elif i == 1:  # top right
@@ -173,14 +173,14 @@ def mosaic_augmentation(img_size, imgs, hs, ws, labels, hyp):
         labels_per_img = labels[i].copy()
         if labels_per_img.size:
             boxes = np.copy(labels_per_img[:, 1:])
-            boxes[:, 0] = w * labels_per_img[:, 1] + padw
-            boxes[:, 1] = h * labels_per_img[:, 2] + padh
-            boxes[:, 2] = w * labels_per_img[:, 3] + padw
-            boxes[:, 3] = h * labels_per_img[:, 4] + padh
-            boxes[:, 4] = w * labels_per_img[:, 5] + padw
-            boxes[:, 5] = h * labels_per_img[:, 6] + padh
-            boxes[:, 6] = w * labels_per_img[:, 7] + padw
-            boxes[:, 7] = h * labels_per_img[:, 8] + padh
+            boxes[:, 0] = w*labels_per_img[:, 1] + padw
+            boxes[:, 1] = h*labels_per_img[:, 2] + padh
+            boxes[:, 2] = w*labels_per_img[:, 3] + padw
+            boxes[:, 3] = h*labels_per_img[:, 4] + padh
+            boxes[:, 4] = w*labels_per_img[:, 5] + padw
+            boxes[:, 5] = h*labels_per_img[:, 6] + padh
+            boxes[:, 6] = w*labels_per_img[:, 7] + padw
+            boxes[:, 7] = h*labels_per_img[:, 8] + padh
             labels_per_img[:, 1:] = boxes
 
         labels4.append(labels_per_img)
@@ -191,11 +191,11 @@ def mosaic_augmentation(img_size, imgs, hs, ws, labels, hyp):
         np.clip(x, 0, 2 * s, out=x)
 
     # Augment
-    img4, labels4 = random_affine(img4, labels4,
-                                  degrees=hyp['degrees'],
-                                  translate=hyp['translate'],
-                                  scale=hyp['scale'],
-                                  shear=hyp['shear'],
-                                  new_shape=(img_size, img_size))
+    # img4, labels4 = random_affine(img4, labels4,
+    #                               degrees=hyp['degrees'],
+    #                               translate=hyp['translate'],
+    #                               scale=hyp['scale'],
+    #                               shear=hyp['shear'],
+    #                               new_shape=(img_size, img_size))
 
     return img4, labels4

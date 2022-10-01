@@ -46,10 +46,10 @@ class ComputeLoss:
         self.reg_max = reg_max
         self.proj = nn.Parameter(torch.linspace(0, self.reg_max, self.reg_max + 1), requires_grad=False)
         self.iou_type = iou_type
-        self.varifocal_loss = VarifocalLoss()
-        # self.varifocal_loss = VarifocalLoss().cuda()
+        # self.varifocal_loss = VarifocalLoss()
+        self.varifocal_loss = VarifocalLoss().cuda()
         # self.bbox_loss = BboxLoss(self.num_classes, self.reg_max, self.use_dfl, self.iou_type)
-        self.l1_loss=L1Loss(self.num_classes, self.reg_max, self.use_dfl)
+        self.l1_loss=L1Loss(self.num_classes, self.reg_max, self.use_dfl).cuda()
         # self.bbox_loss = BboxLoss(self.num_classes, self.reg_max, self.use_dfl, self.iou_type).cuda()
         self.loss_weight = loss_weight
         
