@@ -96,7 +96,7 @@ class Evaler:
             rect = not self.not_infer_on_rect
             dataloader = create_dataloader(self.data[task if task in ('train', 'val', 'test') else 'val'],
                                            self.img_size, self.batch_size, self.stride, hyp=eval_hyp, check_labels=True,
-                                           pad=pad, rect=False,
+                                           pad=pad, rect=False,augment=False,
                                            data_dict=self.data, task=task)[0]
         return dataloader
 

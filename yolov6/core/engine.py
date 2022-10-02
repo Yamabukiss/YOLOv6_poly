@@ -264,8 +264,6 @@ class Trainer:
                                                             )
 
     def prepare_for_steps(self):
-        self.cfg.data_aug.mosaic = 0.0  #想关闭数据增强就解注释这里
-        self.cfg.data_aug.mixup = 0.0
         if self.epoch > self.start_epoch:
             self.scheduler.step()
 
@@ -338,7 +336,7 @@ class Trainer:
         val_loader = None
         if args.rank in [-1, 0]:
             val_loader = create_dataloader(val_path, args.img_size, args.batch_size // args.world_size * 2, grid_size,
-                                           hyp=dict(cfg.data_aug), rect=False, rank=-1, pad=0.5,
+                                           hyp=dict(cfg.data_aug), augment=False,rect=False, rank=-1, pad=0.5,
                                            workers=args.workers, check_images=args.check_images,
                                            check_labels=args.check_labels, data_dict=data_dict, task='val')[0]
 

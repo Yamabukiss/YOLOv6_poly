@@ -146,7 +146,8 @@ def mosaic_augmentation(img_size, imgs, hs, ws, labels, hyp):
 
     labels4 = []
     s = img_size
-    yc, xc = (int(random.uniform(s//2, 3*s//2)) for _ in range(2))  # mosaic center x, y
+    # yc, xc = (int(random.uniform(s//2, 3*s//2)) for _ in range(2))  # mosaic center x, y
+    yc, xc = (s,s)  # mosaic center x, y
     for i in range(len(imgs)):
         # Load image
         img, h, w = imgs[i], hs[i], ws[i]
