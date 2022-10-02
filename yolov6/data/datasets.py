@@ -52,7 +52,7 @@ class TrainValDataset(Dataset):
         hyp=None,
         rect=False,
         check_images=False,
-        check_labels=False,
+        check_labels=True,
         stride=32,
         pad=0.0,
         rank=-1,
@@ -118,7 +118,7 @@ class TrainValDataset(Dataset):
         if self.hyp and "letterbox_return_int" in self.hyp:
             img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment, return_int=self.hyp["letterbox_return_int"])
         else:
-            img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment)
+         img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment)
 
         shapes = (h0, w0), ((h * ratio / h0, w * ratio / w0), pad)  # for COCO mAP rescaling
 
@@ -569,8 +569,8 @@ class TrainValDataset(Dataset):
             if labels:
                 for label in labels:
                     c, x1, y1, x2,y2,x3,y3,x4,y4 = label[:9]
-                    rect_w=abs(int(x3-x1))
-                    rect_h=abs(int(y3-y1))
+                    rect_w=abs(x3-x1)
+                    rect_h=abs(y3-y1)
                     # convert x,y,w,h to x1,y1,x2,y2
                     # cls_id starts from 0
                     cls_id = int(c)

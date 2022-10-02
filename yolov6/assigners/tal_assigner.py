@@ -103,6 +103,7 @@ class TaskAlignedAssigner(nn.Module):
         ind[1] = gt_labels.squeeze(-1)
         bbox_scores = pd_scores[ind[0], ind[1]]
         overlaps = iou_calculator(gt_bboxes, pd_bboxes)
+        # overlaps = poly_iou_calculator(gt_bboxes, pd_bboxes)
         align_metric = bbox_scores.pow(self.alpha) * overlaps.pow(self.beta)
 
         return align_metric, overlaps

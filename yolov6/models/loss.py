@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy
 from yolov6.utils.l1_loss import l1loss
+from yolov6.utils.poly_iou_loss import poly_iou_loss
 from yolov6.assigners.atss_assigner import ATSSAssigner
 from yolov6.assigners.tal_assigner import TaskAlignedAssigner
 
@@ -28,6 +29,7 @@ class ComputeLoss:
                  loss_weight={
                      'class': 1.0,
                      'l1': 2.5,
+                     'poly':2.5,
                      'dfl': 0.5}
                  ):
         
@@ -49,6 +51,7 @@ class ComputeLoss:
         self.varifocal_loss = VarifocalLoss().cuda()
         # self.l1_loss=L1Loss(self.num_classes, self.reg_max, self.use_dfl)
         self.l1_loss=L1Loss(self.num_classes, self.reg_max, self.use_dfl).cuda()
+        # self.poly_loss=PolyLoss(self.num_classes, self.reg_max, self.use_dfl).cuda()
         self.loss_weight = loss_weight
         
     def __call__(
@@ -113,11 +116,17 @@ class ComputeLoss:
 
         loss_l1, loss_dfl = self.l1_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
                                             target_scores, target_scores_sum, fg_mask)
+
+        # loss_poly, loss_dfl = self.poly_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
+        #                                     target_scores, target_scores_sum, fg_mask)
         
         loss = self.loss_weight['class'] * loss_cls + \
                self.loss_weight['l1'] * loss_l1 + \
                self.loss_weight['dfl'] * loss_dfl
-       
+        # loss = self.loss_weight['class'] * loss_cls + \
+        #        self.loss_weight['poly'] * loss_poly + \
+        #        self.loss_weight['dfl'] * loss_dfl
+
         return loss, \
             torch.cat(((self.loss_weight['l1'] * loss_l1).unsqueeze(0),
                          (self.loss_weight['dfl'] * loss_dfl).unsqueeze(0),
@@ -151,6 +160,53 @@ class VarifocalLoss(nn.Module):
             loss = (F.binary_cross_entropy(pred_score.float(), gt_score.float(), reduction='none') * weight).sum()
 
         return loss
+
+class PolyLoss(nn.Module):
+    def __init__(self, num_classes, reg_max, use_dfl=False):
+        super(PolyLoss, self).__init__()
+        self.num_classes = num_classes
+        self.poly_loss = poly_iou_loss()
+        self.reg_max = reg_max
+        self.use_dfl = use_dfl
+
+    def forward(self, pred_dist, pred_bboxes, anchor_points,
+                target_bboxes, target_scores, target_scores_sum, fg_mask):
+
+        # select positive samples mask
+        num_pos = fg_mask.sum()
+        if num_pos > 0:
+            # l1 loss
+            bbox_mask = fg_mask.unsqueeze(-1).repeat([1, 1, 8])
+            pred_bboxes_pos = torch.masked_select(pred_bboxes,
+                                                  bbox_mask).reshape([-1, 8])
+            target_bboxes_pos = torch.masked_select(
+                target_bboxes, bbox_mask).reshape([-1, 8])
+            bbox_weight = torch.masked_select(
+                target_scores.sum(-1), fg_mask).unsqueeze(-1)
+            loss_poly = self.poly_loss(pred_bboxes_pos,
+                                     target_bboxes_pos) * bbox_weight
+            loss_poly = loss_poly.sum() / target_scores_sum
+
+            # dfl loss
+            if self.use_dfl:
+                dist_mask = fg_mask.unsqueeze(-1).repeat(
+                    [1, 1, (self.reg_max + 1) * 4])
+                pred_dist_pos = torch.masked_select(
+                    pred_dist, dist_mask).reshape([-1, 4, self.reg_max + 1])
+                target_ltrb = bbox2dist(anchor_points, target_bboxes, self.reg_max)
+                target_ltrb_pos = torch.masked_select(
+                    target_ltrb, bbox_mask).reshape([-1, 4])
+                loss_dfl = self._df_loss(pred_dist_pos,
+                                         target_ltrb_pos) * bbox_weight
+                loss_dfl = loss_dfl.sum() / target_scores_sum
+            else:
+                loss_dfl = torch.tensor(0.).to(pred_dist.device)
+
+        else:
+            loss_poly = torch.tensor(0.).to(pred_dist.device)
+            loss_dfl = torch.tensor(0.).to(pred_dist.device)
+
+        return loss_poly, loss_dfl
 
 
 class L1Loss(nn.Module):

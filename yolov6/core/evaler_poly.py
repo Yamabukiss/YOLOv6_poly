@@ -96,7 +96,7 @@ class Evaler:
             rect = not self.not_infer_on_rect
             dataloader = create_dataloader(self.data[task if task in ('train', 'val', 'test') else 'val'],
                                            self.img_size, self.batch_size, self.stride, hyp=eval_hyp, check_labels=True,
-                                           pad=pad, rect=rect,
+                                           pad=pad, rect=False,
                                            data_dict=self.data, task=task)[0]
         return dataloader
 
@@ -134,7 +134,7 @@ class Evaler:
 
             # post-process
             t3 = time_sync()
-            outputs = non_max_suppression(outputs, self.conf_thres, self.iou_thres, multi_label=True,max_det=15)
+            outputs = non_max_suppression(outputs, self.conf_thres, self.iou_thres, multi_label=True,max_det=5)
             self.speed_result[3] += time_sync() - t3  # post-process time
             self.speed_result[0] += len(outputs)
 
@@ -356,22 +356,26 @@ class Evaler:
             gain = ratio_pad[0]
             pad = ratio_pad[1]
 
-        coords[:, [0, 2]] -= pad[0]  # x padding
+        coords[:, [0, 2,4,6]] -= pad[0]  # x padding
         if self.scale_exact:
-            coords[:, [0, 2]] /= gain[1]  # x gain
+            coords[:, [0, 2,4,6]] /= gain[1]  # x gain
         else:
-            coords[:, [0, 2]] /= gain[0]  # raw x gain
-        coords[:, [1, 3]] -= pad[1]  # y padding
-        coords[:, [1, 3]] /= gain[0]  # y gain
+            coords[:, [0, 2,4,6]] /= gain[0]  # raw x gain
+        coords[:, [1, 3,5,7]] -= pad[1]  # y padding
+        coords[:, [1, 3,5,7]] /= gain[0]  # y gain
 
         if isinstance(coords, torch.Tensor):  # faster individually
-            coords[:, 0].clamp_(0, img0_shape[1])  # x1
-            coords[:, 1].clamp_(0, img0_shape[0])  # y1
-            coords[:, 2].clamp_(0, img0_shape[1])  # x2
-            coords[:, 3].clamp_(0, img0_shape[0])  # y2
+            coords[:, 0].clamp_(0, img0_shape[1])
+            coords[:, 1].clamp_(0, img0_shape[0])
+            coords[:, 2].clamp_(0, img0_shape[1])
+            coords[:, 3].clamp_(0, img0_shape[0])
+            coords[:, 4].clamp_(0, img0_shape[1])
+            coords[:, 5].clamp_(0, img0_shape[0])
+            coords[:, 6].clamp_(0, img0_shape[1])
+            coords[:, 7].clamp_(0, img0_shape[0])
         else:  # np.array (faster grouped)
-            coords[:, [0, 2]] = coords[:, [0, 2]].clip(0, img0_shape[1])  # x1, x2
-            coords[:, [1, 3]] = coords[:, [1, 3]].clip(0, img0_shape[0])  # y1, y2
+            coords[:, [0, 2,4,6]] = coords[:, [0, 2,4,6]].clip(0, img0_shape[1])  # x1, x2
+            coords[:, [1, 3,5,7]] = coords[:, [1, 3,5,7]].clip(0, img0_shape[0])  # y1, y2
         return coords
 
     def convert_to_coco_format(self, outputs, imgs, paths, shapes, ids):

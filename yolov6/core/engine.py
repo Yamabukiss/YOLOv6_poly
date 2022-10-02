@@ -89,6 +89,7 @@ class Trainer:
 
         self.loss_num = 3
         self.loss_info = ['Epoch', 'l1_loss', 'dfl_loss', 'cls_loss']
+        # self.loss_info = ['Epoch', 'poly_iou_loss', 'dfl_loss', 'cls_loss']
         if self.args.distill:
             self.loss_num += 1
             self.loss_info += ['cwd_loss']
@@ -195,7 +196,7 @@ class Trainer:
                             batch_size=self.batch_size // self.world_size * 2,
                             img_size=self.img_size,
                             model=self.ema.ema if self.args.calib is False else self.model,
-                            conf_thres=0.001,
+                            conf_thres=0.009,
                             # iou_thres=0.3,
                             dataloader=self.val_loader,
                             save_dir=self.save_dir,
@@ -330,14 +331,14 @@ class Trainer:
         grid_size = max(int(max(cfg.model.head.strides)), 32)
         # create train dataloader
         train_loader = create_dataloader(train_path, args.img_size, args.batch_size // args.world_size, grid_size,
-                                         hyp=dict(cfg.data_aug), augment=True, rect=False, rank=args.local_rank,
-                                         workers=args.workers, shuffle=True, check_images=args.check_images,
+                                         hyp=dict(cfg.data_aug), augment=False, rect=False, rank=args.local_rank,
+                                         workers=args.workers, shuffle=False, check_images=args.check_images,
                                          check_labels=args.check_labels, data_dict=data_dict, task='train')[0]
         # create val dataloader
         val_loader = None
         if args.rank in [-1, 0]:
             val_loader = create_dataloader(val_path, args.img_size, args.batch_size // args.world_size * 2, grid_size,
-                                           hyp=dict(cfg.data_aug), rect=True, rank=-1, pad=0.5,
+                                           hyp=dict(cfg.data_aug), rect=False, rank=-1, pad=0.5,
                                            workers=args.workers, check_images=args.check_images,
                                            check_labels=args.check_labels, data_dict=data_dict, task='val')[0]
 
