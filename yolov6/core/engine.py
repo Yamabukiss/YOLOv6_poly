@@ -88,7 +88,7 @@ class Trainer:
 
 
         self.loss_num = 3
-        self.loss_info = ['Epoch', 'iou_loss', 'dfl_loss', 'cls_loss']
+        self.loss_info = ['Epoch', 'l1_loss', 'dfl_loss', 'cls_loss']
         if self.args.distill:
             self.loss_num += 1
             self.loss_info += ['cwd_loss']
@@ -195,8 +195,8 @@ class Trainer:
                             batch_size=self.batch_size // self.world_size * 2,
                             img_size=self.img_size,
                             model=self.ema.ema if self.args.calib is False else self.model,
-                            conf_thres=0.01,
-                            iou_thres=0.3,
+                            conf_thres=0.001,
+                            # iou_thres=0.3,
                             dataloader=self.val_loader,
                             save_dir=self.save_dir,
                             task='train')

@@ -23,6 +23,7 @@ class l1loss:
         gt_xy_list=list(map(lambda x:x,gtbox))
         point_loss_list=list(map(lambda x,y:smooth_l1_loss(x,y,reduction="sum"),pred_xy_list,gt_xy_list))
         point_loss_tensor=torch.tensor(point_loss_list).cuda()
+        # point_loss_tensor=torch.tensor(point_loss_list)
         point_loss_tensor=torch.unsqueeze(point_loss_tensor,-1)
         # total_l1_loss=sum(point_loss_list)
 

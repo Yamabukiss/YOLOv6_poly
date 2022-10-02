@@ -90,75 +90,76 @@ class TrainValDataset(Dataset):
         """
         # Mosaic Augmentation
         # if self.augment and random.random() < self.hyp["mosaic"]:
-        if  random.random() < self.hyp["mosaic"]:
-            img, labels = self.get_mosaic(index)
-            shapes = None
+        # if  random.random() < self.hyp["mosaic"]:
+        # # if  False:
+        #     img, labels = self.get_mosaic(index)
+        #     shapes = None
+        #
+        #     # MixUp augmentation
+        #     if random.random() < self.hyp["mixup"]:
+        #         img_other, labels_other = self.get_mosaic(
+        #             random.randint(0, len(self.img_paths) - 1)
+        #         )
+        #         img, labels = mixup(img, labels, img_other, labels_other)
 
-            # MixUp augmentation
-            if random.random() < self.hyp["mixup"]:
-                img_other, labels_other = self.get_mosaic(
-                    random.randint(0, len(self.img_paths) - 1)
-                )
-                img, labels = mixup(img, labels, img_other, labels_other)
-
-        else:
+        # else:
             # Load image
-            if self.hyp and "test_load_size" in self.hyp:
-                img, (h0, w0), (h, w) = self.load_image(index, self.hyp["test_load_size"])
-            else:
-                img, (h0, w0), (h, w) = self.load_image(index)
+        if self.hyp and "test_load_size" in self.hyp:
+            img, (h0, w0), (h, w) = self.load_image(index, self.hyp["test_load_size"])
+        else:
+            img, (h0, w0), (h, w) = self.load_image(index)
 
-            # Letterbox
-            shape = (
-                self.batch_shapes[self.batch_indices[index]]
-                if self.rect
-                else self.img_size
-            )  # final letterboxed shape
-            if self.hyp and "letterbox_return_int" in self.hyp:
-                img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment, return_int=self.hyp["letterbox_return_int"])
-            else:
-                img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment)
+        # Letterbox
+        shape = (
+            self.batch_shapes[self.batch_indices[index]]
+            if self.rect
+            else self.img_size
+        )  # final letterboxed shape
+        if self.hyp and "letterbox_return_int" in self.hyp:
+            img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment, return_int=self.hyp["letterbox_return_int"])
+        else:
+            img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment)
 
-            shapes = (h0, w0), ((h * ratio / h0, w * ratio / w0), pad)  # for COCO mAP rescaling
+        shapes = (h0, w0), ((h * ratio / h0, w * ratio / w0), pad)  # for COCO mAP rescaling
 
-            labels = self.labels[index].copy()
-            # if labels.size:
-            #     w *= ratio
-            #     h *= ratio
-            #     # new boxes
-            #     boxes = np.copy(labels[:, 1:])
-            #
-            #     boxes[:, 0] = (
-            #         w*labels[:, 1] + pad[0]
-            #     )
-            #
-            #     boxes[:, 1] = (
-            #         h*labels[:, 2] + pad[1]
-            #     )
-            #
-            #     boxes[:, 2] = (
-            #         w*labels[:, 3] + pad[0]
-            #     )
-            #     boxes[:, 3] = (
-            #         h*labels[:, 4] + pad[1]
-            #     )
-            #
-            #     boxes[:, 4] = (
-            #             w*labels[:, 5] + pad[0]
-            #     )
-            #
-            #     boxes[:, 5] = (
-            #             h*labels[:, 6] + pad[1]
-            #     )
-            #
-            #     boxes[:, 6] = (
-            #             w*labels[:, 7] + pad[0]
-            #     )
-            #     boxes[:, 7] = (
-            #             h*labels[:, 8] + pad[1]
-            #     )
-            #
-            #     labels[:, 1:] = boxes
+        labels = self.labels[index].copy()
+        if labels.size:
+            w *= ratio
+            h *= ratio
+            # new boxes
+            boxes = np.copy(labels[:, 1:])
+
+            boxes[:, 0] = (
+                w*labels[:, 1] + pad[0]
+            )
+
+            boxes[:, 1] = (
+                h*labels[:, 2] + pad[1]
+            )
+
+            boxes[:, 2] = (
+                w*labels[:, 3] + pad[0]
+            )
+            boxes[:, 3] = (
+                h*labels[:, 4] + pad[1]
+            )
+
+            boxes[:, 4] = (
+                    w*labels[:, 5] + pad[0]
+            )
+
+            boxes[:, 5] = (
+                    h*labels[:, 6] + pad[1]
+            )
+
+            boxes[:, 6] = (
+                    w*labels[:, 7] + pad[0]
+            )
+            boxes[:, 7] = (
+                    h*labels[:, 8] + pad[1]
+            )
+
+            labels[:, 1:] = boxes
 
             # if self.augment:
             #     img, labels = random_affine(

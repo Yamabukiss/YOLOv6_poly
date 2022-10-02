@@ -7,7 +7,6 @@ import numpy as np
 import torch.nn.functional as F
 from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy
-from yolov6.utils.figure_iou import IOUloss
 from yolov6.utils.l1_loss import l1loss
 from yolov6.assigners.atss_assigner import ATSSAssigner
 from yolov6.assigners.tal_assigner import TaskAlignedAssigner
@@ -48,9 +47,8 @@ class ComputeLoss:
         self.iou_type = iou_type
         # self.varifocal_loss = VarifocalLoss()
         self.varifocal_loss = VarifocalLoss().cuda()
-        # self.bbox_loss = BboxLoss(self.num_classes, self.reg_max, self.use_dfl, self.iou_type)
+        # self.l1_loss=L1Loss(self.num_classes, self.reg_max, self.use_dfl)
         self.l1_loss=L1Loss(self.num_classes, self.reg_max, self.use_dfl).cuda()
-        # self.bbox_loss = BboxLoss(self.num_classes, self.reg_max, self.use_dfl, self.iou_type).cuda()
         self.loss_weight = loss_weight
         
     def __call__(

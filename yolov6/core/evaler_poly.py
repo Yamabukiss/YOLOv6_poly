@@ -134,7 +134,7 @@ class Evaler:
 
             # post-process
             t3 = time_sync()
-            outputs = non_max_suppression(outputs, self.conf_thres, self.iou_thres, multi_label=True)
+            outputs = non_max_suppression(outputs, self.conf_thres, self.iou_thres, multi_label=True,max_det=15)
             self.speed_result[3] += time_sync() - t3  # post-process time
             self.speed_result[0] += len(outputs)
 
@@ -170,7 +170,7 @@ class Evaler:
 
                 # Predictions
                 predn = pred.clone()
-                self.scale_coords(imgs[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
+                self.scale_coords(imgs[si].shape[1:], predn[:, :8], shapes[si][0], shapes[si][1])  # native-space pred
 
                 # Assign all predictions as incorrect
                 correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
