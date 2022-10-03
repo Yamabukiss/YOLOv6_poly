@@ -45,15 +45,15 @@ class ATSSAssigner(nn.Module):
         if self.n_max_boxes == 0:
             device = gt_bboxes.device
             return torch.full( [self.bs, self.n_anchors], self.bg_idx).to(device), \
-                   torch.zeros([self.bs, self.n_anchors, 4]).to(device), \
+                   torch.zeros([self.bs, self.n_anchors, 8]).to(device), \
                    torch.zeros([self.bs, self.n_anchors, self.num_classes]).to(device), \
                    torch.zeros([self.bs, self.n_anchors]).to(device)
 
 
-        overlaps = iou2d_calculator(gt_bboxes.reshape([-1, 4]), anc_bboxes)
+        overlaps = iou2d_calculator(gt_bboxes.reshape([-1, 8]), anc_bboxes)
         overlaps = overlaps.reshape([self.bs, -1, self.n_anchors])
 
-        distances, ac_points = dist_calculator(gt_bboxes.reshape([-1, 4]), anc_bboxes)
+        distances, ac_points = dist_calculator(gt_bboxes.reshape([-1, 8]), anc_bboxes)
         distances = distances.reshape([self.bs, -1, self.n_anchors])
 
         is_in_candidate, candidate_idxs = self.select_topk_candidates(
@@ -70,9 +70,9 @@ class ATSSAssigner(nn.Module):
         is_in_gts = select_candidates_in_gts(ac_points, gt_bboxes)
         mask_pos = is_pos * is_in_gts * mask_gt
 
+
         target_gt_idx, fg_mask, mask_pos = select_highest_overlaps(
             mask_pos, overlaps, self.n_max_boxes)
-            
         # assigned target
         target_labels, target_bboxes, target_scores = self.get_targets(
             gt_labels, gt_bboxes, target_gt_idx, fg_mask)
@@ -151,8 +151,8 @@ class ATSSAssigner(nn.Module):
             target_labels, torch.full_like(target_labels, self.bg_idx))
 
         # assigned target boxes
-        target_bboxes = gt_bboxes.reshape([-1, 4])[target_gt_idx.flatten()]
-        target_bboxes = target_bboxes.reshape([self.bs, self.n_anchors, 4])
+        target_bboxes = gt_bboxes.reshape([-1, 8])[target_gt_idx.flatten()]
+        target_bboxes = target_bboxes.reshape([self.bs, self.n_anchors, 8])
 
         # assigned target scores
         target_scores = F.one_hot(target_labels.long(), self.num_classes + 1).float()

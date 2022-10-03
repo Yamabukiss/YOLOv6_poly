@@ -49,10 +49,16 @@ def dist2bbox(distance, anchor_points, box_format='xyxy'):
 
 def bbox2dist(anchor_points, bbox, reg_max):
     '''Transform bbox(xyxy) to dist(ltrb).'''
-    x1y1, x2y2 = torch.split(bbox, 2, -1)
+    x1y1, x2y2,x3y3,x4y4 = torch.split(bbox, 2, -1)
+    rt=torch.zeros(x1y1.shape,device="cuda:0")
+    lb=torch.zeros(x1y1.shape,device="cuda:0")
     lt = anchor_points - x1y1
-    rb = x2y2 - anchor_points
-    dist = torch.cat([lt, rb], -1).clip(0, reg_max - 0.01)
+    rt[:,:,0] = x2y2[:,:,0]-anchor_points[:,0]
+    rt[:,:,1] = anchor_points[:,1] -x2y2[:,:,1]
+    rb = x3y3 - anchor_points
+    lb[:, :, 0] = anchor_points[:,0]-x4y4[:, :,0]
+    lb[:, :, 1] = x4y4[:, :, 1] - anchor_points[:,1]
+    dist = torch.cat([lt, rt,rb,lb], -1).clip(0, reg_max - 0.01)
     return dist
 
 

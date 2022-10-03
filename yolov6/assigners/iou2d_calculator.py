@@ -40,12 +40,12 @@ def iou2d_calculator(bboxes1, bboxes2, mode='iou', is_aligned=False, scale=1., d
     Returns:
         Tensor: shape (m, n) if ``is_aligned `` is False else shape (m,)
     """
-    assert bboxes1.size(-1) in [0, 4, 5]
+    assert bboxes1.size(-1) in [0, 8, 9]
     assert bboxes2.size(-1) in [0, 4, 5]
     if bboxes2.size(-1) == 5:
         bboxes2 = bboxes2[..., :4]
-    if bboxes1.size(-1) == 5:
-        bboxes1 = bboxes1[..., :4]
+    if bboxes1.size(-1) == 9:
+        bboxes1 = bboxes1[..., :8]
 
     if dtype == 'fp16':
         # change tensor type to save cpu and cuda memory and keep speed
@@ -179,7 +179,7 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
 
     assert mode in ['iou', 'iof', 'giou'], f'Unsupported mode {mode}'
     # Either the boxes are empty or the length of boxes' last dimension is 4
-    assert (bboxes1.size(-1) == 4 or bboxes1.size(0) == 0)
+    assert (bboxes1.size(-1) == 8 or bboxes1.size(0) == 0)
     assert (bboxes2.size(-1) == 4 or bboxes2.size(0) == 0)
 
     # Batch dim must be the same
@@ -198,14 +198,14 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
         else:
             return bboxes1.new(batch_shape + (rows, cols))
 
-    area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (
-        bboxes1[..., 3] - bboxes1[..., 1])
+    area1 = (bboxes1[..., 4] - bboxes1[..., 0]) * (
+        bboxes1[..., 5] - bboxes1[..., 1])
     area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (
         bboxes2[..., 3] - bboxes2[..., 1])
 
     if is_aligned:
         lt = torch.max(bboxes1[..., :2], bboxes2[..., :2])  # [B, rows, 2]
-        rb = torch.min(bboxes1[..., 2:], bboxes2[..., 2:])  # [B, rows, 2]
+        rb = torch.min(bboxes1[..., 4:6], bboxes2[..., 2:])  # [B, rows, 2]
 
         wh = fp16_clamp(rb - lt, min=0)
         overlap = wh[..., 0] * wh[..., 1]
@@ -216,11 +216,11 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
             union = area1
         if mode == 'giou':
             enclosed_lt = torch.min(bboxes1[..., :2], bboxes2[..., :2])
-            enclosed_rb = torch.max(bboxes1[..., 2:], bboxes2[..., 2:])
+            enclosed_rb = torch.max(bboxes1[..., 4:6], bboxes2[..., 2:])
     else:
         lt = torch.max(bboxes1[..., :, None, :2],
                        bboxes2[..., None, :, :2])  # [B, rows, cols, 2]
-        rb = torch.min(bboxes1[..., :, None, 2:],
+        rb = torch.min(bboxes1[..., :, None, 4:6],
                        bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
 
         wh = fp16_clamp(rb - lt, min=0)
@@ -233,7 +233,7 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
         if mode == 'giou':
             enclosed_lt = torch.min(bboxes1[..., :, None, :2],
                                     bboxes2[..., None, :, :2])
-            enclosed_rb = torch.max(bboxes1[..., :, None, 2:],
+            enclosed_rb = torch.max(bboxes1[..., :, None, 4:6],
                                     bboxes2[..., None, :, 2:])
 
     eps = union.new_tensor([eps])

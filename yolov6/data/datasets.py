@@ -185,8 +185,8 @@ class TrainValDataset(Dataset):
 
             labels[:, 1:] = boxes
 
-        if self.augment:
-            img, labels = self.general_augment(img, labels) # about flip
+        # if self.augment:
+        img, labels = self.general_augment(img, labels) # about flip
 
         labels_out = torch.zeros((len(labels), 10))
         if len(labels):
@@ -303,9 +303,6 @@ class TrainValDataset(Dataset):
             for p in img_paths
         )
 
-        # label_paths=sorted(
-        #     glob.glob("D:\yolov6_self\YOLOv6\mineral\labels\\train\[0-9]*.txt")
-        # )
         assert label_paths, f"No labels found in {label_dir}."
         label_hash = self.get_hash(label_paths)
         if "label_hash" not in cache_info or cache_info["label_hash"] != label_hash:

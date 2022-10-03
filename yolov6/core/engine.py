@@ -304,6 +304,7 @@ class Trainer:
     def update_optimizer(self):
         curr_step = self.step + self.max_stepnum * self.epoch
         self.accumulate = max(1, round(64 / self.batch_size))
+        # 此处是在warmup时的
         if curr_step <= self.warmup_stepnum:
             self.accumulate = max(1, np.interp(curr_step, [0, self.warmup_stepnum], [1, 64 / self.batch_size]).round())
             for k, param in enumerate(self.optimizer.param_groups):
@@ -329,7 +330,7 @@ class Trainer:
         grid_size = max(int(max(cfg.model.head.strides)), 32)
         # create train dataloader
         train_loader = create_dataloader(train_path, args.img_size, args.batch_size // args.world_size, grid_size,
-                                         hyp=dict(cfg.data_aug), augment=True, rect=False, rank=args.local_rank,
+                                         hyp=dict(cfg.data_aug), augment=False, rect=False, rank=args.local_rank,
                                          workers=args.workers, shuffle=False, check_images=args.check_images,
                                          check_labels=args.check_labels, data_dict=data_dict, task='train')[0]
         # create val dataloader

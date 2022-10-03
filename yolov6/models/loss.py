@@ -9,7 +9,7 @@ from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy
 from yolov6.utils.l1_loss import l1loss
 from yolov6.utils.poly_iou_loss import poly_iou_loss
-from yolov6.assigners.atss_assigner import ATSSAssigner
+# from yolov6.assigners.atss_assigner import ATSSAssigner
 from yolov6.assigners.tal_assigner import TaskAlignedAssigner
 
 
@@ -21,8 +21,8 @@ class ComputeLoss:
                  grid_cell_offset=0.5,
                  num_classes=80,
                  ori_img_size=640,
-                 # warmup_epoch=4,
-                 warmup_epoch=0,
+                 warmup_epoch=2,
+                 # warmup_epoch=0,
                  use_dfl=True,
                  reg_max=16,
                  iou_type='giou',
@@ -40,7 +40,7 @@ class ComputeLoss:
         self.ori_img_size = ori_img_size
         
         self.warmup_epoch = warmup_epoch
-        self.warmup_assigner = ATSSAssigner(9, num_classes=self.num_classes)
+        # self.warmup_assigner = ATSSAssigner(9, num_classes=self.num_classes)
         self.formal_assigner = TaskAlignedAssigner(topk=13, num_classes=self.num_classes, alpha=1.0, beta=6.0)
 
         self.use_dfl = use_dfl
@@ -79,24 +79,14 @@ class ComputeLoss:
         anchor_points_s = anchor_points / stride_tensor
         pred_bboxes = self.bbox_decode(anchor_points_s, pred_distri) #xyxy
 
-        if epoch_num < self.warmup_epoch:
-            target_labels, target_bboxes, target_scores, fg_mask = \
-                self.warmup_assigner(
-                    anchors,
-                    n_anchors_list,
-                    gt_labels,
-                    gt_bboxes,
-                    mask_gt,
-                    pred_bboxes.detach() * stride_tensor)
-        else:
-            target_labels, target_bboxes, target_scores, fg_mask = \
-                self.formal_assigner(
-                    pred_scores.detach(),
-                    pred_bboxes.detach() * stride_tensor,
-                    anchor_points,
-                    gt_labels,
-                    gt_bboxes,
-                    mask_gt)
+        target_labels, target_bboxes, target_scores, fg_mask = \
+            self.formal_assigner(
+                pred_scores.detach(),
+                pred_bboxes.detach() * stride_tensor,
+                anchor_points,
+                gt_labels,
+                gt_bboxes,
+                mask_gt)
 
         # rescale bbox
         target_bboxes /= stride_tensor
