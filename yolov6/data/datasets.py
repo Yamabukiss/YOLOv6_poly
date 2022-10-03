@@ -52,7 +52,7 @@ class TrainValDataset(Dataset):
         hyp=None,
         rect=False,
         check_images=False,
-        check_labels=True,
+        check_labels=False,
         stride=32,
         pad=0.0,
         rank=-1,
@@ -170,8 +170,6 @@ class TrainValDataset(Dataset):
             #         new_shape=(self.img_size, self.img_size),
             #     )
 
-        # if self.augment:
-        img, labels = self.general_augment(img, labels) # about flip
         if len(labels):
             h, w = img.shape[:2]
 
@@ -187,6 +185,8 @@ class TrainValDataset(Dataset):
 
             labels[:, 1:] = boxes
 
+        if self.augment:
+            img, labels = self.general_augment(img, labels) # about flip
 
         labels_out = torch.zeros((len(labels), 10))
         if len(labels):

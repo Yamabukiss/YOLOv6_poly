@@ -99,7 +99,7 @@ def iou_calculator(box1, box2, eps=1e-9): # for poly now
     x3y3 = torch.minimum(px3y3, gx3y3)
     # x4y4 = torch.minimum(px4y4, gx4y4)
 
-    overlap = (x3y3 - x1y1).clip(0).prod(-1) # clip limit to [] prod 将该维度的所有数相乘  此处仍需优化？ 目前沿用正方形的方法近似
+    overlap = (x3y3 - x1y1).clip(0).prod(-1) # clip limit to [] prod 将该维度的所有数相乘  此处仍需优化 目前沿用正方形的方法近似 clip 0 可以规避问题 令不相交的交集为0
     area1 = (px3y3 - px1y1).clip(0).prod(-1)
     area2 = (gx3y3 - gx1y1).clip(0).prod(-1)
     union = area1 + area2 - overlap + eps
