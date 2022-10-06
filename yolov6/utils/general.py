@@ -26,23 +26,18 @@ def find_latest_checkpoint(search_dir='.'):
     return max(checkpoint_list, key=os.path.getctime) if checkpoint_list else ''
 
 
-def dist2bbox(distance, anchor_points, box_format='xyxy'):
+def dist2bbox(distance, anchor_points):
     '''Transform distance(ltrb) to box(xywh or xyxy).'''
-    point_list = torch.split(distance, 2, -1)
-    p1=point_list[0]
-    p2=point_list[1]
-    p3=point_list[2]
-    p4=point_list[3]
-    p1 = anchor_points - p1
-    p2 = anchor_points + p2
-    p3 = anchor_points + p3
-    p4 = anchor_points - p4
-    # if box_format == 'xyxy':
-    #     bbox = torch.cat([x1y1, x2y2], -1)
-    # elif box_format == 'xywh':
-    #     c_xy = (x1y1 + x2y2) / 2
-    #     wh = x2y2 - x1y1
-    #     bbox = torch.cat([c_xy, wh], -1)
+    x1y1,x2y2,x3y3,x4y4 = torch.split(distance, 2, -1)
+    p2=torch.zeros(x1y1.shape,device="cuda:0")
+    p4=torch.zeros(x1y1.shape,device="cuda:0")
+
+    p1 = anchor_points - x1y1
+    p2[:,:,0] = anchor_points[:,0] + x2y2[:,:,0]
+    p2[:,:,1] = anchor_points[:,1] - x2y2[:,:,1]
+    p3 = anchor_points + x3y3
+    p4[:, :, 0] = anchor_points[:, 0] - x4y4[:, :, 0]
+    p4[:, :, 1] = anchor_points[:, 1] + x4y4[:, :, 1]
     bbox = torch.cat([p1,p2,p3,p4], -1)
     return bbox
 

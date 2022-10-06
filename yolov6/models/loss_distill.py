@@ -29,7 +29,7 @@ class ComputeLoss:
                  loss_weight={
                      'class': 1.0,
                      'iou': 2.5,
-                     'l1':1,
+                     'l1':2.5,
                      'dfl': 0.5,
                      'cwd': 10.0},
                  distill_feat = False,
@@ -47,7 +47,7 @@ class ComputeLoss:
         
         self.warmup_epoch = warmup_epoch
         self.warmup_assigner = ATSSAssigner(9, num_classes=self.num_classes)
-        self.formal_assigner = TaskAlignedAssigner(topk=13, num_classes=self.num_classes, alpha=1.0, beta=6.0)
+        self.formal_assigner = TaskAlignedAssigner(topk=10, num_classes=self.num_classes, alpha=1.0, beta=6.0)
 
         self.use_dfl = use_dfl
         self.reg_max = reg_max
@@ -95,23 +95,13 @@ class ComputeLoss:
         t_anchor_points_s = t_anchor_points / t_stride_tensor
         t_pred_bboxes = self.bbox_decode(t_anchor_points_s, t_pred_distri) #xyxy
 
-        if epoch_num < self.warmup_epoch:
-            target_labels, target_bboxes, target_scores, fg_mask = \
-                self.warmup_assigner(
-                    anchors,
-                    n_anchors_list,
-                    gt_labels,
-                    gt_bboxes,
-                    mask_gt,
-                    pred_bboxes.detach() * stride_tensor)
-        else:
-            target_labels, target_bboxes, target_scores, fg_mask = \
-                self.formal_assigner(
-                    pred_scores.detach(),
-                    pred_bboxes.detach() * stride_tensor,
-                    anchor_points,
-                    gt_labels,
-                    gt_bboxes,
+        target_labels, target_bboxes, target_scores, fg_mask = \
+            self.formal_assigner(
+                pred_scores.detach(),
+                pred_bboxes.detach() * stride_tensor,
+                anchor_points,
+                gt_labels,
+                gt_bboxes,
                     mask_gt)
 
         # rescale bbox
@@ -120,7 +110,7 @@ class ComputeLoss:
         # cls loss
         target_labels = torch.where(fg_mask > 0, target_labels, torch.full_like(target_labels, self.num_classes))
         one_hot_label = F.one_hot(target_labels, self.num_classes + 1)[..., :-1]
-        loss_cls = self.varifocal_loss(pred_scores, target_scores, one_hot_label)
+        loss_cls = self.varifocal_loss(pred_scores, target_scores, one_hot_label) # a hard cls loss from student
    
         target_scores_sum = target_scores.sum()
         loss_cls /= target_scores_sum
@@ -132,7 +122,7 @@ class ComputeLoss:
         logits_student = pred_scores
         logits_teacher = t_pred_scores
         distill_num_classes = self.num_classes
-        d_loss_cls = self.distill_loss_cls(logits_student, logits_teacher, distill_num_classes, temperature)
+        d_loss_cls = self.distill_loss_cls(logits_student, logits_teacher, distill_num_classes, temperature) # teacher and student soft label mult
         if self.distill_feat:
             d_loss_cw = self.distill_loss_cw(s_featmaps, t_featmaps)
         else:
@@ -234,7 +224,7 @@ class L1Loss(nn.Module):
         # select positive samples mask
         num_pos = fg_mask.sum()
         if num_pos > 0:
-            # iou loss
+            # l1 loss
             bbox_mask = fg_mask.unsqueeze(-1).repeat([1, 1, 8])
             pred_bboxes_pos = torch.masked_select(pred_bboxes,
                                                   bbox_mask).reshape([-1, 8])
@@ -276,61 +266,6 @@ class L1Loss(nn.Module):
 
         return loss_iou, loss_dfl, d_loss_dfl
 
-
-# class BboxLoss(nn.Module):
-#     def __init__(self, num_classes, reg_max, use_dfl=False, iou_type='giou'):
-#         super(BboxLoss, self).__init__()
-#         self.num_classes = num_classes
-#         self.iou_loss = IOUloss(box_format='xyxy', iou_type=iou_type, eps=1e-10)
-#         self.reg_max = reg_max
-#         self.use_dfl = use_dfl
-#
-#     def forward(self, pred_dist, pred_bboxes, t_pred_dist, t_pred_bboxes, temperature, anchor_points,
-#                 target_bboxes, target_scores, target_scores_sum, fg_mask):
-#         # select positive samples mask
-#         num_pos = fg_mask.sum()
-#         if num_pos > 0:
-#             # iou loss
-#             bbox_mask = fg_mask.unsqueeze(-1).repeat([1, 1, 4])
-#             pred_bboxes_pos = torch.masked_select(pred_bboxes,
-#                                                   bbox_mask).reshape([-1, 4])
-#             t_pred_bboxes_pos = torch.masked_select(t_pred_bboxes,
-#                                                   bbox_mask).reshape([-1, 4])
-#             target_bboxes_pos = torch.masked_select(
-#                 target_bboxes, bbox_mask).reshape([-1, 4])
-#             bbox_weight = torch.masked_select(
-#                 target_scores.sum(-1), fg_mask).unsqueeze(-1)
-#             loss_iou = self.iou_loss(pred_bboxes_pos,
-#                                      target_bboxes_pos) * bbox_weight
-#             loss_iou = loss_iou.sum() / target_scores_sum
-#
-#             # dfl loss
-#             if self.use_dfl:
-#                 dist_mask = fg_mask.unsqueeze(-1).repeat(
-#                     [1, 1, (self.reg_max + 1) * 4])
-#                 pred_dist_pos = torch.masked_select(
-#                     pred_dist, dist_mask).reshape([-1, 4, self.reg_max + 1])
-#                 t_pred_dist_pos = torch.masked_select(
-#                     t_pred_dist, dist_mask).reshape([-1, 4, self.reg_max + 1])
-#                 target_ltrb = bbox2dist(anchor_points, target_bboxes, self.reg_max)
-#                 target_ltrb_pos = torch.masked_select(
-#                     target_ltrb, bbox_mask).reshape([-1, 4])
-#                 loss_dfl = self._df_loss(pred_dist_pos,
-#                                         target_ltrb_pos) * bbox_weight
-#                 d_loss_dfl = self.distill_loss_dfl(pred_dist_pos, t_pred_dist_pos, temperature) * bbox_weight
-#                 loss_dfl = loss_dfl.sum() / target_scores_sum
-#                 d_loss_dfl = d_loss_dfl.sum() / target_scores_sum
-#             else:
-#                 loss_dfl = torch.tensor(0.).to(pred_dist.device)
-#                 d_loss_dfl = torch.tensor(0.).to(pred_dist.device)
-#
-#         else:
-#
-#             loss_iou = torch.tensor(0.).to(pred_dist.device)
-#             loss_dfl = torch.tensor(0.).to(pred_dist.device)
-#             d_loss_dfl = torch.tensor(0.).to(pred_dist.device)
-#
-#         return loss_iou, loss_dfl, d_loss_dfl
 
     def _df_loss(self, pred_dist, target):
         target_left = target.to(torch.long)

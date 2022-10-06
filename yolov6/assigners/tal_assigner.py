@@ -54,7 +54,7 @@ class TaskAlignedAssigner(nn.Module):
 
         
         mask_pos, align_metric, overlaps = self.get_pos_mask(
-            pd_scores, pd_bboxes, gt_labels, gt_bboxes, anc_points, mask_gt)
+            pd_scores, pd_bboxes, gt_labels, gt_bboxes, anc_points, mask_gt) # mask of topk index t iou_of_anchor
         target_gt_idx, fg_mask, mask_pos = select_highest_overlaps(
             mask_pos, overlaps, self.n_max_boxes)
         # assigned target
@@ -63,8 +63,8 @@ class TaskAlignedAssigner(nn.Module):
 
         # normalize
         align_metric *= mask_pos
-        pos_align_metrics = align_metric.max(axis=-1, keepdim=True)[0]
-        pos_overlaps = (overlaps * mask_pos).max(axis=-1, keepdim=True)[0]
+        pos_align_metrics = align_metric.max(axis=-1, keepdim=True)[0] # get the max t value
+        pos_overlaps = (overlaps * mask_pos).max(axis=-1, keepdim=True)[0] #  get the max iou value
         norm_align_metric = (align_metric * pos_overlaps / (pos_align_metrics + self.eps)).max(-2)[0].unsqueeze(-1)
         target_scores = target_scores * norm_align_metric
 
@@ -79,14 +79,14 @@ class TaskAlignedAssigner(nn.Module):
                      mask_gt):
 
         # get anchor_align metric
-        align_metric, overlaps = self.get_box_metrics(pd_scores, pd_bboxes, gt_labels, gt_bboxes)
+        align_metric, overlaps = self.get_box_metrics(pd_scores, pd_bboxes, gt_labels, gt_bboxes) # return the  t  and the iou
         # get in_gts mask
-        mask_in_gts = select_candidates_in_gts(anc_points, gt_bboxes)
+        mask_in_gts = select_candidates_in_gts(anc_points, gt_bboxes) #choose the point included by the polygon output the bool tensor
         # get topk_metric mask
         mask_topk = self.select_topk_candidates(
-            align_metric * mask_in_gts, topk_mask=mask_gt.repeat([1, 1, self.topk]).bool()) #选中了在gt里的那些anchor且乘以t
+            align_metric * mask_in_gts, topk_mask=mask_gt.repeat([1, 1, self.topk]).bool()) # output a topk mask
         # merge all mask to a final mask
-        mask_pos = mask_topk * mask_in_gts * mask_gt
+        mask_pos = mask_topk * mask_in_gts * mask_gt #topk mask
 
         return mask_pos, align_metric, overlaps
     
@@ -103,7 +103,6 @@ class TaskAlignedAssigner(nn.Module):
         ind[1] = gt_labels.squeeze(-1)
         bbox_scores = pd_scores[ind[0], ind[1]]
         overlaps = iou_calculator(gt_bboxes, pd_bboxes)
-        # overlaps = poly_iou_calculator(gt_bboxes, pd_bboxes)
         align_metric = bbox_scores.pow(self.alpha) * overlaps.pow(self.beta)
 
         return align_metric, overlaps
@@ -120,7 +119,7 @@ class TaskAlignedAssigner(nn.Module):
             topk_mask = (topk_metrics.max(axis=-1, keepdim=True) > self.eps).tile(
                 [1, 1, self.topk])
         topk_idxs = torch.where(topk_mask, topk_idxs, torch.zeros_like(topk_idxs)) #（约束，成立就这个，不成立就这个）
-        is_in_topk = F.one_hot(topk_idxs, num_anchors).sum(axis=-2)
+        is_in_topk = F.one_hot(topk_idxs, num_anchors).sum(axis=-2) # 创建一个anchor大小的tensor 其在topk_idxs中的index位置的数值置1
         is_in_topk = torch.where(is_in_topk > 1,
             torch.zeros_like(is_in_topk), is_in_topk)
         return is_in_topk.to(metrics.dtype)
@@ -132,18 +131,19 @@ class TaskAlignedAssigner(nn.Module):
                     fg_mask):
         
         # assigned target labels
-        batch_ind = torch.arange(end=self.bs, dtype=torch.int64, device=gt_labels.device)[...,None]
+        batch_ind = torch.arange(end=self.bs, dtype=torch.int64, device=gt_labels.device)[...,None] # like the range but without end value
+        # a (batch,1) tensor the value is the batch num
         target_gt_idx = target_gt_idx + batch_ind * self.n_max_boxes
-        target_labels = gt_labels.long().flatten()[target_gt_idx]
+        target_labels = gt_labels.long().flatten()[target_gt_idx] # get all batch gt label
 
         # assigned target boxes
-        target_bboxes = gt_bboxes.reshape([-1, 8])[target_gt_idx]
+        target_bboxes = gt_bboxes.reshape([-1, 8])[target_gt_idx] #get all batch gt label
 
         # assigned target scores       
         target_labels[target_labels<0] = 0
-        target_scores = F.one_hot(target_labels, self.num_classes)
+        target_scores = F.one_hot(target_labels, self.num_classes) # turns to one_hot form
         fg_scores_mask  = fg_mask[:, :, None].repeat(1, 1, self.num_classes)
         target_scores = torch.where(fg_scores_mask > 0, target_scores,
                                         torch.full_like(target_scores, 0))
-        
+
         return target_labels, target_bboxes, target_scores

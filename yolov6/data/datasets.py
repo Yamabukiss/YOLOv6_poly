@@ -76,6 +76,7 @@ class TrainValDataset(Dataset):
             )  # batch indices of each image
             self.sort_files_shapes()
         t2 = time.time()
+        self.flip_probability=0.5
         if self.main_process:
             LOGGER.info(f"%.1fs for dataset initialization." % (t2 - t1))
 
@@ -169,7 +170,6 @@ class TrainValDataset(Dataset):
             #         shear=self.hyp["shear"],
             #         new_shape=(self.img_size, self.img_size),
             #     )
-
         if len(labels):
             h, w = img.shape[:2]
 
@@ -186,7 +186,8 @@ class TrainValDataset(Dataset):
             labels[:, 1:] = boxes
 
         # if self.augment:
-        img, labels = self.general_augment(img, labels) # about flip
+        if random.random()<self.flip_probability:
+            img, labels = self.general_augment(img, labels) # about flip
 
         labels_out = torch.zeros((len(labels), 10))
         if len(labels):

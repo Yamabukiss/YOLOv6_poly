@@ -170,15 +170,15 @@ class Trainer:
                     }
 
             save_ckpt_dir = osp.join(self.save_dir, 'weights')
-            save_checkpoint(ckpt, (is_val_epoch) and (self.ap == self.best_ap), save_ckpt_dir, model_name='last_ckpt')
-            if self.epoch >= self.max_epoch - self.args.save_ckpt_on_last_n_epoch:
+            save_checkpoint(ckpt, (is_val_epoch) and (self.ap == self.best_ap), save_ckpt_dir, model_name='last_ckpt',best_ap=self.best_ap)
+            if self.epoch >= self.max_epoch - self.args.save_ckpt_on_last_n_epoch:# save the last epoch ckpt
                 save_checkpoint(ckpt, False, save_ckpt_dir, model_name=f'{self.epoch}_ckpt')
 
             #default save best ap ckpt in stop strong aug epochs
             if self.epoch >= self.max_epoch - self.args.stop_aug_last_n_epoch:
                 if self.best_stop_strong_aug_ap < self.ap:
                     self.best_stop_strong_aug_ap = max(self.ap, self.best_stop_strong_aug_ap)
-                    save_checkpoint(ckpt, False, save_ckpt_dir, model_name='best_stop_aug_ckpt')
+                    save_checkpoint(ckpt, False, save_ckpt_dir, model_name=f'best_stop_aug_{self.best_stop_strong_aug_ap}_ckpt')
                 
             del ckpt
             # log for learning rate
@@ -337,7 +337,7 @@ class Trainer:
         val_loader = None
         if args.rank in [-1, 0]:
             val_loader = create_dataloader(val_path, args.img_size, args.batch_size // args.world_size * 2, grid_size,
-                                           hyp=dict(cfg.data_aug), augment=False,rect=False, rank=-1, pad=0.5,
+                                           hyp=dict(cfg.data_aug), augment=False,rect=False, rank=-1, pad=0, #pad init 0.5
                                            workers=args.workers, check_images=args.check_images,
                                            check_labels=args.check_labels, data_dict=data_dict, task='val')[0]
 

@@ -41,7 +41,7 @@ class ComputeLoss:
         
         self.warmup_epoch = warmup_epoch
         # self.warmup_assigner = ATSSAssigner(9, num_classes=self.num_classes)
-        self.formal_assigner = TaskAlignedAssigner(topk=13, num_classes=self.num_classes, alpha=1.0, beta=6.0)
+        self.formal_assigner = TaskAlignedAssigner(topk=10, num_classes=self.num_classes, alpha=1.0, beta=6.0)
 
         self.use_dfl = use_dfl
         self.reg_max = reg_max
@@ -61,7 +61,7 @@ class ComputeLoss:
         epoch_num
     ):
         
-        feats, pred_scores, pred_distri = outputs
+        feats, pred_scores, pred_distri = outputs # featuremap(3 from fpn strategy) probability_of_label pred_reg_output(bias)
         anchors, anchor_points, n_anchors_list, stride_tensor = \
                generate_anchors(feats, self.fpn_strides, self.grid_cell_size, self.grid_cell_offset, device=feats[0].device)
    
@@ -69,15 +69,16 @@ class ComputeLoss:
         gt_bboxes_scale = torch.full((1,8), self.ori_img_size).type_as(pred_scores)
         batch_size = pred_scores.shape[0]
 
-        # targets
+        # targets is  label + reg  the normalize data will multiply the scale now is 640
         targets =self.preprocess(targets, batch_size, gt_bboxes_scale)
         gt_labels = targets[:, :, :1]
         gt_bboxes = targets[:, :, 1:] #xyxy
         mask_gt = (gt_bboxes.sum(-1, keepdim=True) > 0).float()
-        
+        #mask_gt means the gt num in a batch img
+
         # pboxes
-        anchor_points_s = anchor_points / stride_tensor
-        pred_bboxes = self.bbox_decode(anchor_points_s, pred_distri) #xyxy
+        anchor_points_s = anchor_points / stride_tensor # the anchor point for the feature point
+        pred_bboxes = self.bbox_decode(anchor_points_s, pred_distri) # decode the bias to point (find the right anchor point?)
 
         target_labels, target_bboxes, target_scores, fg_mask = \
             self.formal_assigner(
@@ -86,13 +87,13 @@ class ComputeLoss:
                 anchor_points,
                 gt_labels,
                 gt_bboxes,
-                mask_gt)
+                mask_gt) # the score means the positive sample point score
 
         # rescale bbox
         target_bboxes /= stride_tensor
 
         # cls loss
-        target_labels = torch.where(fg_mask > 0, target_labels, torch.full_like(target_labels, self.num_classes))
+        target_labels = torch.where(fg_mask > 0, target_labels, torch.full_like(target_labels, self.num_classes)) # fg is the postive point mask
         one_hot_label = F.one_hot(target_labels.long(), self.num_classes + 1)[..., :-1]
         loss_cls = self.varifocal_loss(pred_scores, target_scores, one_hot_label)
             
@@ -100,10 +101,6 @@ class ComputeLoss:
         loss_cls /= target_scores_sum
         
         # bbox loss
-
-        # loss_iou, loss_dfl = self.bbox_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
-        #                                     target_scores, target_scores_sum, fg_mask)
-
         loss_l1, loss_dfl = self.l1_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
                                             target_scores, target_scores_sum, fg_mask)
 
@@ -180,12 +177,12 @@ class PolyLoss(nn.Module):
             # dfl loss
             if self.use_dfl:
                 dist_mask = fg_mask.unsqueeze(-1).repeat(
-                    [1, 1, (self.reg_max + 1) * 4])
+                    [1, 1, (self.reg_max + 1) * 8])
                 pred_dist_pos = torch.masked_select(
-                    pred_dist, dist_mask).reshape([-1, 4, self.reg_max + 1])
+                    pred_dist, dist_mask).reshape([-1, 8, self.reg_max + 1])
                 target_ltrb = bbox2dist(anchor_points, target_bboxes, self.reg_max)
                 target_ltrb_pos = torch.masked_select(
-                    target_ltrb, bbox_mask).reshape([-1, 4])
+                    target_ltrb, bbox_mask).reshape([-1, 8])
                 loss_dfl = self._df_loss(pred_dist_pos,
                                          target_ltrb_pos) * bbox_weight
                 loss_dfl = loss_dfl.sum() / target_scores_sum
@@ -228,12 +225,12 @@ class L1Loss(nn.Module):
             # dfl loss
             if self.use_dfl:
                 dist_mask = fg_mask.unsqueeze(-1).repeat(
-                    [1, 1, (self.reg_max + 1) * 4])
+                    [1, 1, (self.reg_max + 1) * 8])
                 pred_dist_pos = torch.masked_select(
-                    pred_dist, dist_mask).reshape([-1, 4, self.reg_max + 1])
+                    pred_dist, dist_mask).reshape([-1, 8, self.reg_max + 1])
                 target_ltrb = bbox2dist(anchor_points, target_bboxes, self.reg_max)
                 target_ltrb_pos = torch.masked_select(
-                    target_ltrb, bbox_mask).reshape([-1, 4])
+                    target_ltrb, bbox_mask).reshape([-1, 8])
                 loss_dfl = self._df_loss(pred_dist_pos,
                                          target_ltrb_pos) * bbox_weight
                 loss_dfl = loss_dfl.sum() / target_scores_sum
@@ -247,68 +244,27 @@ class L1Loss(nn.Module):
         return loss_l1, loss_dfl
 
 
+    def _df_loss(self, pred_dist, target):
+        target_left = target.to(torch.long)
+        target_right = target_left + 1
+        weight_left = target_right.to(torch.float) - target
+        weight_right = 1 - weight_left
+        loss_left = F.cross_entropy(
+            pred_dist.view(-1, self.reg_max + 1), target_left.view(-1), reduction='none').view(
+            target_left.shape) * weight_left
+        loss_right = F.cross_entropy(
+            pred_dist.view(-1, self.reg_max + 1), target_right.view(-1), reduction='none').view(
+            target_left.shape) * weight_right
+        return (loss_left + loss_right).mean(-1, keepdim=True)
 
-# class BboxLoss(nn.Module):
-#     def __init__(self, num_classes, reg_max, use_dfl=False, iou_type='giou'):
-#         super(BboxLoss, self).__init__()
-#         self.num_classes = num_classes
-#         self.iou_loss = IOUloss(box_format='xyxy', iou_type=iou_type, eps=1e-10)
-#         self.reg_max = reg_max
-#         self.use_dfl = use_dfl
-#
-#     def forward(self, pred_dist, pred_bboxes, anchor_points,
-#                 target_bboxes, target_scores, target_scores_sum, fg_mask):
-#
-#         # select positive samples mask
-#         num_pos = fg_mask.sum()
-#         if num_pos > 0:
-#             # iou loss
-#             bbox_mask = fg_mask.unsqueeze(-1).repeat([1, 1, 8]) #candidates mask
-#             pred_bboxes_pos = torch.masked_select(pred_bboxes,
-#                                                   bbox_mask).reshape([-1, 8]) # pred box
-#             target_bboxes_pos = torch.masked_select(
-#                 target_bboxes, bbox_mask).reshape([-1, 8]) # target box
-#
-#             bbox_weight = torch.masked_select(
-#                 target_scores.sum(-1), fg_mask).unsqueeze(-1)
-#
-#             loss_l1=self
-#
-#             loss_iou = self.iou_loss(pred_bboxes_pos,
-#                                      target_bboxes_pos) * bbox_weight
-#             loss_iou = loss_iou.sum() / target_scores_sum
-#
-#             # dfl loss
-#             if self.use_dfl:
-#                 dist_mask = fg_mask.unsqueeze(-1).repeat(
-#                     [1, 1, (self.reg_max + 1) * 4])
-#                 pred_dist_pos = torch.masked_select(
-#                     pred_dist, dist_mask).reshape([-1, 4, self.reg_max + 1])
-#                 target_ltrb = bbox2dist(anchor_points, target_bboxes, self.reg_max)
-#                 target_ltrb_pos = torch.masked_select(
-#                     target_ltrb, bbox_mask).reshape([-1, 4])
-#                 loss_dfl = self._df_loss(pred_dist_pos,
-#                                         target_ltrb_pos) * bbox_weight
-#                 loss_dfl = loss_dfl.sum() / target_scores_sum
-#             else:
-#                 loss_dfl = torch.tensor(0.).to(pred_dist.device)
-#
-#         else:
-#             loss_iou = torch.tensor(0.).to(pred_dist.device)
-#             loss_dfl = torch.tensor(0.).to(pred_dist.device)
-#
-#         return loss_iou, loss_dfl
-#
-#     def _df_loss(self, pred_dist, target):
-#         target_left = target.to(torch.long)
-#         target_right = target_left + 1
-#         weight_left = target_right.to(torch.float) - target
-#         weight_right = 1 - weight_left
-#         loss_left = F.cross_entropy(
-#             pred_dist.view(-1, self.reg_max + 1), target_left.view(-1), reduction='none').view(
-#             target_left.shape) * weight_left
-#         loss_right = F.cross_entropy(
-#             pred_dist.view(-1, self.reg_max + 1), target_right.view(-1), reduction='none').view(
-#             target_left.shape) * weight_right
-#         return (loss_left + loss_right).mean(-1, keepdim=True)
-#
+
+    def distill_loss_dfl(self, logits_student, logits_teacher, temperature=20):
+        logits_student = logits_student.view(-1, 17)
+        logits_teacher = logits_teacher.view(-1, 17)
+        pred_student = F.softmax(logits_student / temperature, dim=1)
+        pred_teacher = F.softmax(logits_teacher / temperature, dim=1)
+        log_pred_student = torch.log(pred_student)
+
+        d_loss_dfl = F.kl_div(log_pred_student, pred_teacher, reduction="none").sum(1).mean()
+        d_loss_dfl *= temperature ** 2
+        return d_loss_dfl

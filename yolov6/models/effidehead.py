@@ -123,7 +123,7 @@ class Detect(nn.Module):
             reg_dist_list = torch.cat(reg_dist_list, axis=-1).permute(0, 2, 1)
 
 
-            pred_bboxes = dist2bbox(reg_dist_list, anchor_points, box_format='xywh')
+            pred_bboxes = dist2bbox(reg_dist_list, anchor_points)
             pred_bboxes *= stride_tensor
             return torch.cat(
                 [

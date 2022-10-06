@@ -85,7 +85,7 @@ class Inferer:
             txt_path = osp.join(save_dir, rel_path, osp.splitext(osp.basename(img_path))[0])
             os.makedirs(osp.join(save_dir, rel_path), exist_ok=True)
 
-            gn = torch.tensor(img_src.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            gn = torch.tensor(img_src.shape)[[1, 0, 1, 0,1,0,1,0]]  # normalization gain whwh
             img_ori = img_src.copy()
 
             # check image and font
@@ -93,10 +93,10 @@ class Inferer:
             self.font_check()
 
             if len(det):
-                det[:, :4] = self.rescale(img.shape[2:], det[:, :4], img_src.shape).round()
+                det[:, :8] = self.rescale(img.shape[2:], det[:, :8], img_src.shape).round()
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
-                        xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                        xywh = torch.tensor(xyxy).view(1, 8) / gn.view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf)
                         with open(txt_path + '.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
@@ -130,7 +130,7 @@ class Inferer:
                     cv2.namedWindow(str(img_path), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
                     cv2.resizeWindow(str(img_path), img_src.shape[1], img_src.shape[0])
                 cv2.imshow(str(img_path), img_src)
-                cv2.waitKey(1)  # 1 millisecond
+                cv2.waitKey(0)  # 1 millisecond
 
             # Save results (image with detections)
             if save_img:
@@ -160,7 +160,6 @@ class Inferer:
         image = torch.from_numpy(np.ascontiguousarray(image))
         image = image.half() if half else image.float()  # uint8 to fp16/32
         image /= 255  # 0 - 255 to 0.0 - 1.0
-
         return image, img_src
 
     @staticmethod
@@ -169,14 +168,18 @@ class Inferer:
         ratio = min(ori_shape[0] / target_shape[0], ori_shape[1] / target_shape[1])
         padding = (ori_shape[1] - target_shape[1] * ratio) / 2, (ori_shape[0] - target_shape[0] * ratio) / 2
 
-        boxes[:, [0, 2]] -= padding[0]
-        boxes[:, [1, 3]] -= padding[1]
-        boxes[:, :4] /= ratio
+        boxes[:, [0, 2,4,6]] -= padding[0]
+        boxes[:, [1, 3,5,7]] -= padding[1]
+        boxes[:, :8] /= ratio
 
         boxes[:, 0].clamp_(0, target_shape[1])  # x1
         boxes[:, 1].clamp_(0, target_shape[0])  # y1
         boxes[:, 2].clamp_(0, target_shape[1])  # x2
         boxes[:, 3].clamp_(0, target_shape[0])  # y2
+        boxes[:, 4].clamp_(0, target_shape[1])  # x3
+        boxes[:, 5].clamp_(0, target_shape[0])  # y3
+        boxes[:, 6].clamp_(0, target_shape[1])  # x4
+        boxes[:, 7].clamp_(0, target_shape[0])  # y4
 
         return boxes
 
@@ -232,17 +235,14 @@ class Inferer:
     @staticmethod
     def plot_box_and_label(image, lw, box, label='', color=(128, 128, 128), txt_color=(255, 255, 255)):
         # Add one xyxy box to image with label
-        p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
-        cv2.rectangle(image, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
+        # p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
+        # cv2.rectangle(image, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
         if label:
-            tf = max(lw - 1, 1)  # font thickness
-            w, h = cv2.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[0]  # text width, height
-            outside = p1[1] - h - 3 >= 0  # label fits outside box
-            p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
-            cv2.rectangle(image, p1, p2, color, -1, cv2.LINE_AA)  # filled
-            cv2.putText(image, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2), 0, lw / 3, txt_color,
-                        thickness=tf, lineType=cv2.LINE_AA)
-
+                cv2.line(image,(int(box[0].item()),int(box[1].item())),(int(box[2].item()),int(box[3].item())),(255,0,0),2)
+                cv2.line(image,(int(box[2].item()),int(box[3].item())),(int(box[4].item()),int(box[5].item())),(255,0,0),2)
+                cv2.line(image,(int(box[4].item()),int(box[5].item())),(int(box[6].item()),int(box[7].item())),(255,0,0),2)
+                cv2.line(image,(int(box[0].item()),int(box[1].item())),(int(box[6].item()),int(box[7].item())),(255,0,0),2)
+                cv2.putText(image,label,(int(box[0].item())-5,int(box[1].item())-5),0,lw/3,txt_color,2)
     @staticmethod
     def font_check(font=r'D:\yolov6_origin\YOLOv6\yolov6\utils\Arial.ttf', size=10):
         # Return a PIL TrueType Font, downloading to CONFIG_DIR if necessary

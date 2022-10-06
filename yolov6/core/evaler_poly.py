@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 import os
+
+import cv2
 from tqdm import tqdm
 import numpy as np
 import json
@@ -134,7 +136,7 @@ class Evaler:
 
             # post-process
             t3 = time_sync()
-            outputs = non_max_suppression(outputs, self.conf_thres, self.iou_thres, multi_label=True,max_det=5)
+            outputs = non_max_suppression(outputs, self.conf_thres, self.iou_thres, multi_label=True,max_det=10)
             self.speed_result[3] += time_sync() - t3  # post-process time
             self.speed_result[0] += len(outputs)
 
@@ -392,8 +394,8 @@ class Evaler:
             scores = pred[:, 8]
             for ind in range(pred.shape[0]):
                 category_id = ids[int(cls[ind])]
-                bbox = [round(x, 7) for x in bboxes[ind].tolist()]
-                score = round(scores[ind].item(), 9)
+                bbox = [round(x, 3) for x in bboxes[ind].tolist()]
+                score = round(scores[ind].item(), 5)
                 pred_data = {
                     "image_id": image_id,
                     "category_id": category_id,

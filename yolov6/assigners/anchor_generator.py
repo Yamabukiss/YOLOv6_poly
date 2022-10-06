@@ -26,10 +26,10 @@ def generate_anchors(feats, fpn_strides, grid_cell_size=5.0, grid_cell_offset=0.
     else:
         for i, stride in enumerate(fpn_strides):
             _, _, h, w = feats[i].shape
-            cell_half_size = grid_cell_size * stride * 0.5
+            cell_half_size = grid_cell_size * stride * 0.5 # to the origin img?
             shift_x = (torch.arange(end=w, device=device) + grid_cell_offset) * stride
             shift_y = (torch.arange(end=h, device=device) + grid_cell_offset) * stride
-            shift_y, shift_x = torch.meshgrid(shift_y, shift_x)
+            shift_y, shift_x = torch.meshgrid(shift_y, shift_x) # generate the grid contains the all featuremap
             anchor = torch.stack(
                 [
                     shift_x - cell_half_size, shift_y - cell_half_size,

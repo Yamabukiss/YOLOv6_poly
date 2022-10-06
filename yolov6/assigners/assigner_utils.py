@@ -41,7 +41,6 @@ def select_candidates_in_gts(xy_centers, gt_bboxes, eps=1e-9):
     bs, n_max_boxes, _ = gt_bboxes.size()
     _gt_bboxes = gt_bboxes.reshape([-1, 8])
     xy_centers = xy_centers.unsqueeze(0).repeat(bs * n_max_boxes, 1, 1) 
-
     gt_bboxes_p1 = _gt_bboxes[:, 0:2].unsqueeze(1).repeat(1, n_anchors, 1)
     gt_bboxes_p2 = _gt_bboxes[:, 2:4].unsqueeze(1).repeat(1, n_anchors, 1)
     gt_bboxes_p3 = _gt_bboxes[:, 4:6].unsqueeze(1).repeat(1, n_anchors, 1)
@@ -61,7 +60,7 @@ def select_candidates_in_gts(xy_centers, gt_bboxes, eps=1e-9):
     # b_rb = gt_bboxes_rb - xy_centers
     bbox_deltas = torch.cat([b_p1,b_p2,b_p3,b_p4], dim=-1)
     bbox_deltas = bbox_deltas.reshape([bs, n_max_boxes, n_anchors, -1])
-    return (bbox_deltas.min(axis=-1)[0] > eps).to(gt_bboxes.dtype)
+    return (bbox_deltas.min(axis=-1)[0] > eps).to(gt_bboxes.dtype) #all 8 points should > eps show every feat point contains or not
 
 def select_highest_overlaps(mask_pos, overlaps, n_max_boxes):
     """if an anchor box is assigned to multiple gts,
@@ -83,7 +82,7 @@ def select_highest_overlaps(mask_pos, overlaps, n_max_boxes):
         is_max_overlaps = is_max_overlaps.permute(0, 2, 1).to(overlaps.dtype)
         mask_pos = torch.where(mask_multi_gts, is_max_overlaps, mask_pos)
         fg_mask = mask_pos.sum(axis=-2)
-    target_gt_idx = mask_pos.argmax(axis=-2)
+    target_gt_idx = mask_pos.argmax(axis=-2) # if the dim=-2 is 1 it 's all 0 if dim=-2 is 2 means there is 2 gt box it show the positive sample is from which gt box
     return target_gt_idx, fg_mask , mask_pos
 
 def iou_calculator(box1, box2, eps=1e-9): # for poly now

@@ -86,9 +86,9 @@ def random_affine(img, labels=(), degrees=10, translate=.1, scale=.1, shear=10,
 
     # Transform label coordinates
     if n:
-        new = np.zeros((n, 4))
+        new = np.zeros((n, 8))
 
-        xy = np.ones((n * 4, 3))
+        xy = np.ones((n * 8, 3))
         xy[:, :2] = labels[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
         xy = xy @ M.T  # transform
         xy = xy[:, :2].reshape(n, 8)  # perspective rescale or affine
