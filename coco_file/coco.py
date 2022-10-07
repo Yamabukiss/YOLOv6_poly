@@ -399,7 +399,7 @@ class COCO:
                 x1,y1, x2, y2,x3,y3, x4, y4, = [bb[0],bb[1],bb[2],bb[3],bb[4],bb[5],bb[6],bb[7]]
                 if not 'segmentation' in ann:
                     ann['segmentation'] = [[x1,y1, x2, y2,x3,y3, x4, y4]]
-                ann['area'] = "is a poly"
+                ann['area'] = abs(x3-x1)*abs(y3-y1)
                 ann['id'] = id+1
                 ann['iscrowd'] = 0
         elif 'segmentation' in anns[0]:
@@ -461,7 +461,7 @@ class COCO:
         print('Converting ndarray to lists...')
         assert(type(data) == np.ndarray)
         print(data.shape)
-        assert(data.shape[1] == 7)
+        assert(data.shape[1] == 11)
         N = data.shape[0]
         ann = []
         for i in range(N):
@@ -469,9 +469,9 @@ class COCO:
                 print('{}/{}'.format(i,N))
             ann += [{
                 'image_id'  : int(data[i, 0]),
-                'bbox'  : [ data[i, 1], data[i, 2], data[i, 3], data[i, 4] ],
-                'score' : data[i, 5],
-                'category_id': int(data[i, 6]),
+                'bbox'  : [ data[i, 1], data[i, 2], data[i, 3], data[i, 4],data[i, 5], data[i, 6], data[i, 7], data[i, 8] ],
+                'score' : data[i, 9],
+                'category_id': int(data[i, 10]),
                 }]
         return ann
 
