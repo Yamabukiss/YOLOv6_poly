@@ -1,7 +1,8 @@
 # YOLOv6n model
 model = dict(
     type='YOLOv6n',
-    pretrained='D:\yolov6_self\YOLOv6\weights\yolov6n.pt',
+    # pretrained='D:\yolov6_self\YOLOv6\weights\yolov6n.pt',
+    pretrained='',
     depth_multiple=0.33,
     width_multiple=0.25,
     backbone=dict(
@@ -23,12 +24,12 @@ model = dict(
         out_indices=[17, 20, 23],
         strides=[8, 16, 32],
         iou_type='siou',
-        use_dfl=True,
-        distill_weight={
-            'class': 1.0,
-            'dfl': 1.0,
-        },
-        reg_max=16 #if use_dfl is False, please set reg_max to 0
+        use_dfl=False,
+        # distill_weight={
+        #     'class': 1.0,
+        #     'dfl': 1.0,
+        # },
+        reg_max=0 #if use_dfl is False, please set reg_max to 0
     )
 )
 

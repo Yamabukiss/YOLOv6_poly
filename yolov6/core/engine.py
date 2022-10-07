@@ -88,8 +88,7 @@ class Trainer:
 
 
         self.loss_num = 3
-        self.loss_info = ['Epoch', 'l1_loss', 'dfl_loss', 'cls_loss']
-        # self.loss_info = ['Epoch', 'poly_iou_loss', 'dfl_loss', 'cls_loss']
+        self.loss_info = ['Epoch', 'poly_loss', 'dfl_loss', 'cls_loss']
         if self.args.distill:
             self.loss_num += 1
             self.loss_info += ['cwd_loss']
@@ -251,14 +250,12 @@ class Trainer:
         self.compute_loss = ComputeLoss(num_classes=self.data_dict['nc'],
                                         ori_img_size=self.img_size,
                                         use_dfl=self.cfg.model.head.use_dfl,
-                                        reg_max=self.cfg.model.head.reg_max,
-                                        iou_type=self.cfg.model.head.iou_type)
+                                        reg_max=self.cfg.model.head.reg_max,)
         if self.args.distill:                             
             self.compute_loss_distill = ComputeLoss_distill(num_classes=self.data_dict['nc'],
                                                             ori_img_size=self.img_size,
                                                             use_dfl=self.cfg.model.head.use_dfl,
                                                             reg_max=self.cfg.model.head.reg_max,
-                                                            iou_type=self.cfg.model.head.iou_type,
                                                             distill_weight = self.cfg.model.head.distill_weight,
                                                             distill_feat = self.args.distill_feat,
                                                             )

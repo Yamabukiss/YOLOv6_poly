@@ -394,7 +394,7 @@ class Evaler:
             scores = pred[:, 8]
             for ind in range(pred.shape[0]):
                 category_id = ids[int(cls[ind])]
-                bbox = [round(x, 3) for x in bboxes[ind].tolist()]
+                bbox = [round(x, 9) for x in bboxes[ind].tolist()]
                 score = round(scores[ind].item(), 5)
                 pred_data = {
                     "image_id": image_id,

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy
 from yolov6.utils.figure_iou import IOUloss
-from yolov6.utils.l1_loss import l1loss
+from yolov6.utils.poly_loss import Poly_loss
 from yolov6.assigners.atss_assigner import ATSSAssigner
 from yolov6.assigners.tal_assigner import TaskAlignedAssigner
 
@@ -25,11 +25,9 @@ class ComputeLoss:
                  warmup_epoch=0,
                  use_dfl=True,
                  reg_max=16,
-                 iou_type='giou',
                  loss_weight={
                      'class': 1.0,
-                     'iou': 2.5,
-                     'l1':2.5,
+                     'poly': 2.5,
                      'dfl': 0.5,
                      'cwd': 10.0},
                  distill_feat = False,
@@ -52,10 +50,8 @@ class ComputeLoss:
         self.use_dfl = use_dfl
         self.reg_max = reg_max
         self.proj = nn.Parameter(torch.linspace(0, self.reg_max, self.reg_max + 1), requires_grad=False)
-        self.iou_type = iou_type
         self.varifocal_loss = VarifocalLoss().cuda()
-        # self.bbox_loss = BboxLoss(self.num_classes, self.reg_max, self.use_dfl, self.iou_type).cuda()
-        self.l1_loss=L1Loss(self.num_classes, self.reg_max, self.use_dfl).cuda()
+        self.poly_loss=PolyLoss(self.num_classes, self.reg_max, self.use_dfl).cuda()
         self.loss_weight = loss_weight
         self.distill_feat = distill_feat
         self.distill_weight = distill_weight
@@ -116,7 +112,7 @@ class ComputeLoss:
         loss_cls /= target_scores_sum
         
         # bbox loss
-        loss_iou, loss_dfl, d_loss_dfl = self.l1_loss(pred_distri, pred_bboxes, t_pred_distri, t_pred_bboxes, temperature, anchor_points_s,
+        loss_poly, loss_dfl, d_loss_dfl = self.poly_loss(pred_distri, pred_bboxes, t_pred_distri, t_pred_bboxes, temperature, anchor_points_s,
                                                      target_bboxes, target_scores, target_scores_sum, fg_mask)
         
         logits_student = pred_scores
@@ -135,12 +131,12 @@ class ComputeLoss:
         loss_cls_all = loss_cls + d_loss_cls * self.distill_weight['class']
         loss_dfl_all = loss_dfl + d_loss_dfl * self.distill_weight['dfl']
         loss = self.loss_weight['class'] * loss_cls_all + \
-               self.loss_weight['iou'] * loss_iou + \
+               self.loss_weight['poly'] * loss_poly + \
                self.loss_weight['dfl'] * loss_dfl_all + \
                self.loss_weight['cwd'] * d_loss_cw
        
         return loss, \
-            torch.cat(((self.loss_weight['iou'] * loss_iou).unsqueeze(0), 
+            torch.cat(((self.loss_weight['poly'] * loss_poly).unsqueeze(0),
                          (self.loss_weight['dfl'] * loss_dfl_all).unsqueeze(0),
                          (self.loss_weight['class'] * loss_cls_all).unsqueeze(0),
                          (self.loss_weight['cwd'] * d_loss_cw).unsqueeze(0))).detach()
@@ -209,11 +205,11 @@ class VarifocalLoss(nn.Module):
 
         return loss
 
-class L1Loss(nn.Module):
+class PolyLoss(nn.Module):
     def __init__(self, num_classes, reg_max, use_dfl=False):
-        super(L1Loss, self).__init__()
+        super(PolyLoss, self).__init__()
         self.num_classes = num_classes
-        self.l1loss = l1loss()
+        self.polyloss = Poly_loss()
         self.reg_max = reg_max
         self.use_dfl = use_dfl
 
@@ -224,7 +220,7 @@ class L1Loss(nn.Module):
         # select positive samples mask
         num_pos = fg_mask.sum()
         if num_pos > 0:
-            # l1 loss
+            # poly loss
             bbox_mask = fg_mask.unsqueeze(-1).repeat([1, 1, 8])
             pred_bboxes_pos = torch.masked_select(pred_bboxes,
                                                   bbox_mask).reshape([-1, 8])
@@ -234,9 +230,9 @@ class L1Loss(nn.Module):
                 target_bboxes, bbox_mask).reshape([-1, 8])
             bbox_weight = torch.masked_select(
                 target_scores.sum(-1), fg_mask).unsqueeze(-1)
-            loss_iou = self.l1loss(pred_bboxes_pos,
+            loss_poly = self.polyloss(pred_bboxes_pos,
                                      target_bboxes_pos) * bbox_weight
-            loss_iou = loss_iou.sum() / target_scores_sum
+            loss_poly = loss_poly.sum() / target_scores_sum
 
             # dfl loss
             if self.use_dfl:
@@ -260,11 +256,11 @@ class L1Loss(nn.Module):
 
         else:
 
-            loss_iou = torch.tensor(0.).to(pred_dist.device)
+            loss_poly = torch.tensor(0.).to(pred_dist.device)
             loss_dfl = torch.tensor(0.).to(pred_dist.device)
             d_loss_dfl = torch.tensor(0.).to(pred_dist.device)
 
-        return loss_iou, loss_dfl, d_loss_dfl
+        return loss_poly, loss_dfl, d_loss_dfl
 
 
     def _df_loss(self, pred_dist, target):
