@@ -113,23 +113,23 @@ class ComputeLoss:
         
         # bbox loss
         loss_poly, loss_dfl, d_loss_dfl = self.poly_loss(pred_distri, pred_bboxes, t_pred_distri, t_pred_bboxes, temperature, anchor_points_s,
-                                                     target_bboxes, target_scores, target_scores_sum, fg_mask)
+                                                     target_bboxes, target_scores, target_scores_sum, fg_mask) # dfl loss  kl soft for reg
         
         logits_student = pred_scores
         logits_teacher = t_pred_scores
         distill_num_classes = self.num_classes
-        d_loss_cls = self.distill_loss_cls(logits_student, logits_teacher, distill_num_classes, temperature) # teacher and student soft label mult
+        d_loss_cls = self.distill_loss_cls(logits_student, logits_teacher, distill_num_classes, temperature) # kl soft for cls
         if self.distill_feat:
             d_loss_cw = self.distill_loss_cw(s_featmaps, t_featmaps)
         else:
             d_loss_cw = torch.tensor(0.).to(feats[0].device)
         import math
-        distill_weightdecay = ((1 - math.cos(epoch_num * math.pi / max_epoch)) / 2) * (0.01- 1) + 1
+        distill_weightdecay = ((1 - math.cos(epoch_num * math.pi / max_epoch)) / 2) * (0.01- 1) + 1 # the alpha it will decaly by the time Suitable way
         d_loss_dfl *= distill_weightdecay
         d_loss_cls *= distill_weightdecay
         d_loss_cw *= distill_weightdecay
-        loss_cls_all = loss_cls + d_loss_cls * self.distill_weight['class']
-        loss_dfl_all = loss_dfl + d_loss_dfl * self.distill_weight['dfl']
+        loss_cls_all = loss_cls + d_loss_cls * self.distill_weight['class'] # hard cls + kl soft for cls
+        loss_dfl_all = loss_dfl + d_loss_dfl * self.distill_weight['dfl']   # dfl loss  + kl soft for reg
         loss = self.loss_weight['class'] * loss_cls_all + \
                self.loss_weight['poly'] * loss_poly + \
                self.loss_weight['dfl'] * loss_dfl_all + \
@@ -276,14 +276,14 @@ class PolyLoss(nn.Module):
             target_left.shape) * weight_right
         return (loss_left + loss_right).mean(-1, keepdim=True)
 
-    def distill_loss_dfl(self, logits_student, logits_teacher, temperature=20):
+    def distill_loss_dfl(self, logits_student, logits_teacher, temperature=20): # two dist
 
-        logits_student = logits_student.view(-1,17)
-        logits_teacher = logits_teacher.view(-1,17)
+        logits_student = logits_student.view(-1,self.reg_max+1)
+        logits_teacher = logits_teacher.view(-1,self.reg_max+1)
         pred_student = F.softmax(logits_student / temperature, dim=1)
         pred_teacher = F.softmax(logits_teacher / temperature, dim=1)
         log_pred_student = torch.log(pred_student)
 
-        d_loss_dfl = F.kl_div(log_pred_student, pred_teacher, reduction="none").sum(1).mean()
+        d_loss_dfl = F.kl_div(log_pred_student, pred_teacher, reduction="none").sum(1).mean() #kl soft loss here for reg
         d_loss_dfl *= temperature**2
         return d_loss_dfl
