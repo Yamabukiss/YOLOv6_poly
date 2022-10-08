@@ -169,7 +169,7 @@ class Trainer:
                     }
 
             save_ckpt_dir = osp.join(self.save_dir, 'weights')
-            save_checkpoint(ckpt, (is_val_epoch) and (self.ap == self.best_ap), save_ckpt_dir, model_name='last_ckpt',best_ap=self.best_ap)
+            save_checkpoint(ckpt, (is_val_epoch) and (self.ap == self.best_ap), save_ckpt_dir, model_name='last_ckpt')
             if self.epoch >= self.max_epoch - self.args.save_ckpt_on_last_n_epoch:# save the last epoch ckpt
                 save_checkpoint(ckpt, False, save_ckpt_dir, model_name=f'{self.epoch}_ckpt')
 
@@ -291,7 +291,7 @@ class Trainer:
         if self.main_process:
             LOGGER.info(f'\nTraining completed in {(time.time() - self.start_time) / 3600:.3f} hours.')
             save_ckpt_dir = osp.join(self.save_dir, 'weights')
-            strip_optimizer(save_ckpt_dir, self.epoch)  # strip optimizers for saved pt model
+            strip_optimizer(save_ckpt_dir, self.epoch,self.best_ap)# strip optimizers for saved pt model
 
     # Empty cache if training finished
     def train_after_loop(self):

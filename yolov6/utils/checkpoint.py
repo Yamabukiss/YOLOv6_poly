@@ -32,31 +32,31 @@ def load_checkpoint(weights, map_location=None, inplace=True, fuse=True):
     return model
 
 
-def save_checkpoint(ckpt, is_best, save_dir, model_name="",best_ap=None):
+def save_checkpoint(ckpt, is_best, save_dir, model_name=""):
     """ Save checkpoint to the disk."""
     if not osp.exists(save_dir):
         os.makedirs(save_dir)
     filename = osp.join(save_dir, model_name + '.pt')
     torch.save(ckpt, filename)
     if is_best:
-        if best_ap:
-            best_filename = osp.join(save_dir, f'best_{best_ap}_ckpt.pt')
-            shutil.copyfile(filename, best_filename)
+        best_filename = osp.join(save_dir, 'best_ckpt.pt')
+        shutil.copyfile(filename, best_filename)
 
 
-def strip_optimizer(ckpt_dir, epoch):
+def strip_optimizer(ckpt_dir, epoch,best_ap):
     """Delete optimizer from saved checkpoint file"""
-    for s in ['best', 'last']:
-        ckpt_path = osp.join(ckpt_dir, '{}_ckpt.pt'.format(s))
-        if not osp.exists(ckpt_path):
-            continue
-        ckpt = torch.load(ckpt_path, map_location=torch.device('cpu'))
-        if ckpt.get('ema'):
-            ckpt['model'] = ckpt['ema']  # replace model with ema
-        for k in ['optimizer', 'ema', 'updates']:  # keys
-            ckpt[k] = None
-        ckpt['epoch'] = epoch
-        ckpt['model'].half()  # to FP16
-        for p in ckpt['model'].parameters():
-            p.requires_grad = False
-        torch.save(ckpt, ckpt_path)
+    # for s in ['best', 'last']:
+    ckpt_path = osp.join(ckpt_dir, 'best_ckpt.pt')
+    if not osp.exists(ckpt_path):
+        return
+    ckpt = torch.load(ckpt_path, map_location=torch.device('cpu'))
+    if ckpt.get('ema'):
+        ckpt['model'] = ckpt['ema']  # replace model with ema
+    for k in ['optimizer', 'ema', 'updates']:  # keys
+        ckpt[k] = None
+    ckpt['epoch'] = epoch
+    ckpt['model'].half()  # to FP16
+    for p in ckpt['model'].parameters():
+        p.requires_grad = False
+    ckpt_path = osp.join(ckpt_dir, 'best_{}_ckpt.pt'.format(best_ap))
+    torch.save(ckpt, ckpt_path)

@@ -26,7 +26,7 @@ class ComputeLoss:
                  reg_max=16,
                  loss_weight={
                      'class': 1.0,
-                     'poly':2.5,
+                     'poly':1.0,
                      'dfl': 0.5}
                  ):
         

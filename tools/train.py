@@ -24,10 +24,10 @@ from yolov6.utils.general import increment_name, find_latest_checkpoint
 def get_args_parser(add_help=True):
     parser = argparse.ArgumentParser(description='YOLOv6 PyTorch Training', add_help=add_help)
     parser.add_argument('--data-path', default='D:\yolov6_self\YOLOv6\data\dataset.yaml', type=str, help='path of dataset')
-    parser.add_argument('--conf-file', default='D:\yolov6_self\YOLOv6\configs\yolov6s_finetune.py', type=str, help='experiments description file')
+    parser.add_argument('--conf-file', default='D:\yolov6_self\YOLOv6\configs\yolov6n_finetune.py', type=str, help='experiments description file')
     parser.add_argument('--img-size', default=640, type=int, help='train, val image size (pixels)')
     parser.add_argument('--batch-size', default=4, type=int, help='total batch size for all GPUs')
-    parser.add_argument('--epochs', default=100 , type=int, help='number of total epochs to run')
+    parser.add_argument('--epochs', default=5 , type=int, help='number of total epochs to run')
     parser.add_argument('--workers', default=1, type=int, help='number of data loading workers (default: 8)')
     parser.add_argument('--device', default='0', type=str, help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--eval-interval', default=1, type=int, help='evaluate at every interval epochs')
@@ -43,7 +43,7 @@ def get_args_parser(add_help=True):
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume the most recent training')
     parser.add_argument('--write_trainbatch_tb', default=True,action='store_true', help='write train_batch image to tensorboard once an epoch, may slightly slower train speed if open')
-    parser.add_argument('--stop_aug_last_n_epoch', default=10, type=int, help='stop strong aug at last n epoch, neg value not stop, default 15')# 规避数据增强导致的缺点 即远远脱离自然图片的真实分布（不包括filp）若不到300epoch 可将此处设为10~15
+    parser.add_argument('--stop_aug_last_n_epoch', default=5, type=int, help='stop strong aug at last n epoch, neg value not stop, default 15')# 规避数据增强导致的缺点 即远远脱离自然图片的真实分布（不包括filp）若不到300epoch 可将此处设为10~15
     parser.add_argument('--save_ckpt_on_last_n_epoch', default=-1, type=int, help='save last n epoch even not best or last, neg value not save')
     parser.add_argument('--distill',action='store_true',default=False, help='distill or not')
     parser.add_argument('--distill_feat',action='store_true', default=False,help='distill featmap or not')

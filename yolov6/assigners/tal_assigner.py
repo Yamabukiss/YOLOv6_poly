@@ -134,16 +134,17 @@ class TaskAlignedAssigner(nn.Module):
         batch_ind = torch.arange(end=self.bs, dtype=torch.int64, device=gt_labels.device)[...,None] # like the range but without end value
         # a (batch,1) tensor the value is the batch num
         target_gt_idx = target_gt_idx + batch_ind * self.n_max_boxes
-        target_labels = gt_labels.long().flatten()[target_gt_idx] # get all batch gt label
+        target_labels = gt_labels.long().flatten()[target_gt_idx] # assign the gt label in feature map (flatten)
+
 
         # assigned target boxes
-        target_bboxes = gt_bboxes.reshape([-1, 8])[target_gt_idx] #get all batch gt label
+        target_bboxes = gt_bboxes.reshape([-1, 8])[target_gt_idx] #ass the gt reg in feature map (flatten)
 
         # assigned target scores       
         target_labels[target_labels<0] = 0
-        target_scores = F.one_hot(target_labels, self.num_classes) # turns to one_hot form
+        target_scores = F.one_hot(target_labels, self.num_classes) # encode to the one hot form
         fg_scores_mask  = fg_mask[:, :, None].repeat(1, 1, self.num_classes)
         target_scores = torch.where(fg_scores_mask > 0, target_scores,
-                                        torch.full_like(target_scores, 0))
+                                        torch.full_like(target_scores, 0)) #positve area retention information
 
         return target_labels, target_bboxes, target_scores
