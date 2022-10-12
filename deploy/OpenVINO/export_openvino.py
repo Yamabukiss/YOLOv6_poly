@@ -22,10 +22,10 @@ from yolov6.utils.checkpoint import load_checkpoint
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='./yolov6s.pt', help='weights path')
+    parser.add_argument('--weights', type=str, default=r'D:\yolov6_self\YOLOv6\deploy\OpenVINO\best_0.5794332536701946_ckpt.pt', help='weights path')
     parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='image size')  # height, width
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
-    parser.add_argument('--half', action='store_true', help='FP16 half-precision export')
+    parser.add_argument('--half', default=True,action='store_true', help='FP16 half-precision export')
     parser.add_argument('--inplace', action='store_true', help='set Detect() inplace=True')
     parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     args = parser.parse_args()

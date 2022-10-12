@@ -17,11 +17,11 @@ from yolov6.core.inferer import Inferer
 
 def get_args_parser(add_help=True):
     parser = argparse.ArgumentParser(description='YOLOv6 PyTorch Inference.', add_help=add_help)
-    parser.add_argument('--weights', type=str, default=r'D:\yolov6_self\YOLOv6\result\best_0.5226612132771131_ckpt.pt', help='model path(s) for inference.')
-    parser.add_argument('--source', type=str, default=r'D:\yolov6_self\YOLOv6\mineral\images\train', help='the source path, e.g. image-file/dir.')
+    parser.add_argument('--weights', type=str, default=r'D:\yolov6_self\YOLOv6\tools\best_0.5794332536701946_ckpt.pt', help='model path(s) for inference.')
+    parser.add_argument('--source', type=str, default=r'D:\yolov6_self\YOLOv6\mineral2', help='the source path, e.g. image-file/dir.')
     parser.add_argument('--yaml', type=str, default='D:\yolov6_origin\YOLOv6\data\dataset.yaml', help='data yaml file.')
     parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='the image-size(h,w) in inference size.')
-    parser.add_argument('--conf-thres', type=float, default=0.2, help='confidence threshold for inference.')
+    parser.add_argument('--conf-thres', type=float, default=0.1, help='confidence threshold for inference.')
     parser.add_argument('--iou-thres', type=float, default=0.1, help='NMS IoU threshold for inference.')
     parser.add_argument('--max-det', type=int, default=10, help='maximal inferences per image.')
     parser.add_argument('--device', default='0', help='device to run our model i.e. 0 or 0,1,2,3 or cpu.')

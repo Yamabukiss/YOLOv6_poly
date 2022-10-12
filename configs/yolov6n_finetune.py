@@ -1,7 +1,7 @@
 # YOLOv6n model
 model = dict(
     type='YOLOv6n',
-    pretrained='D:\yolov6_self\YOLOv6\weights\yolov6n.pt',
+    pretrained=r'D:\yolov6_self\YOLOv6\weights\yolov6n.pt',
     # pretrained='',
     depth_multiple=0.33,
     width_multiple=0.25,
@@ -26,7 +26,7 @@ model = dict(
         iou_type='siou',
         use_dfl=False,
         # distill_weight={
-        #     'class': 1.0,
+        #     'class': 3.0,
         #     'dfl': 1.0,
         # },
         reg_max=0 #if use_dfl is False, please set reg_max to 0

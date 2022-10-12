@@ -27,7 +27,7 @@ def get_args_parser(add_help=True):
     parser.add_argument('--conf-file', default='D:\yolov6_self\YOLOv6\configs\yolov6n_finetune.py', type=str, help='experiments description file')
     parser.add_argument('--img-size', default=640, type=int, help='train, val image size (pixels)')
     parser.add_argument('--batch-size', default=4, type=int, help='total batch size for all GPUs')
-    parser.add_argument('--epochs', default=5 , type=int, help='number of total epochs to run')
+    parser.add_argument('--epochs', default=50 , type=int, help='number of total epochs to run')
     parser.add_argument('--workers', default=1, type=int, help='number of data loading workers (default: 8)')
     parser.add_argument('--device', default='0', type=str, help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--eval-interval', default=1, type=int, help='evaluate at every interval epochs')
@@ -120,7 +120,16 @@ def main(args):
         LOGGER.info('Destroying process group... ')
         dist.destroy_process_group()
 
+def show_model():
+    args = get_args_parser().parse_args()
+    args.rank, args.local_rank, args.world_size = get_envs()
+    cfg, device, args = check_and_init(args)
+    args.rank, args.local_rank, args.world_size = get_envs()
+    from yolov6.models.yolo import build_model
+    model=build_model(cfg,2,device="cuda:0")
+    return model
 
 if __name__ == '__main__':
     args = get_args_parser().parse_args()
     main(args)
+    # show_model()

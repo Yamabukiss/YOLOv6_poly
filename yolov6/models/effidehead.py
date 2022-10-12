@@ -71,6 +71,7 @@ class Detect(nn.Module):
         self.proj = nn.Parameter(torch.linspace(0, self.reg_max, self.reg_max + 1), requires_grad=False)
         self.proj_conv.weight = nn.Parameter(self.proj.view([1, self.reg_max + 1, 1, 1]).clone().detach(),
                                                    requires_grad=False)
+        # self.maxpool2d=nn.MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False)
 
     def forward(self, x):
         if self.training:
@@ -81,9 +82,13 @@ class Detect(nn.Module):
                 x[i] = self.stems[i](x[i])
                 cls_x = x[i]
                 reg_x = x[i]
+
                 cls_feat = self.cls_convs[i](cls_x)
+                # cls_feat=self.maxpool2d(cls_feat)
                 cls_output = self.cls_preds[i](cls_feat)
+
                 reg_feat = self.reg_convs[i](reg_x)
+                # reg_feat = self.maxpool2d(reg_feat)
                 reg_output = self.reg_preds[i](reg_feat)
 
                 cls_output = torch.sigmoid(cls_output)

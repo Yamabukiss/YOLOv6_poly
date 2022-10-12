@@ -86,6 +86,7 @@ class RepPANNeck(nn.Module):
             stride=2
         )
 
+        # self.maxpool2d = nn.MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False) #1/2
     def upsample_enable_quant(self, num_bits, calib_method):
         print("Insert fakequant after upsample")
         # Insert fakequant after upsample op to build TensorRT engine
@@ -114,11 +115,9 @@ class RepPANNeck(nn.Module):
             upsample_feat1 = self.upsample_feat1_quant(upsample_feat1)
         f_concat_layer1 = torch.cat([upsample_feat1, x2], 1)
         pan_out2 = self.Rep_p3(f_concat_layer1)
-
         down_feat1 = self.downsample2(pan_out2)
         p_concat_layer1 = torch.cat([down_feat1, fpn_out1], 1)
         pan_out1 = self.Rep_n3(p_concat_layer1)
-
         down_feat0 = self.downsample1(pan_out1)
         p_concat_layer2 = torch.cat([down_feat0, fpn_out0], 1)
         pan_out0 = self.Rep_n4(p_concat_layer2)

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 import torch
+from torch.nn.functional import smooth_l1_loss
+
 
 class Poly_loss:
     def __init__(self,centroid_loss_weight=0.2,angle_loss_weight=5.0,length_loss_weight=1.0):
@@ -9,13 +11,51 @@ class Poly_loss:
         self.length_loss_weight=length_loss_weight
 
     def __call__(self, predbox, gtbox):
+        return self.smoothLnloss(predbox,gtbox)
+
+    def smoothLnloss(self,predbox,gtbox):
+        wchr=torch.max(predbox[:,2],predbox[:,4])-torch.min(predbox[:,0],predbox[:,6])
+        hchr=torch.max(predbox[:,5],predbox[:,7])-torch.min(predbox[:,1],predbox[:,3])
+        _, predbox_x, predbox_y, gtbox_x, gtbox_y = self.get_centroid(predbox, gtbox)
+
+        d_centroid_x=(gtbox_x-predbox_x)/wchr
+        d_centroid_y=(gtbox_y-predbox_y)/hchr
+
+        d_p1_x=(gtbox[:,0]-predbox[:,0])/wchr
+        d_p1_y=(gtbox[:,1]-predbox[:,1])/hchr
+
+        d_p2_x=(gtbox[:,2]-predbox[:,2])/wchr
+        d_p2_y=(gtbox[:,3]-predbox[:,3])/hchr
+
+        d_p3_x=(gtbox[:,4]-predbox[:,4])/wchr
+        d_p3_y=(gtbox[:,5]-predbox[:,5])/hchr
+
+        d_p4_x=(gtbox[:,6]-predbox[:,6])/wchr
+        d_p4_y=(gtbox[:,7]-predbox[:,7])/hchr
+
+        lnloss=lambda x:(torch.abs(x)+1)*torch.log(torch.abs(x)+1)-abs(x)
+
+        d_points=torch.cat([d_centroid_x,d_centroid_y,d_p1_x,d_p1_y,d_p2_x,d_p2_y,d_p3_x,d_p3_y,d_p4_x,d_p4_y],dim=-1)
+
+        d_centroid_x=lnloss(d_points)
+
+        result=torch.sum(d_centroid_x)
+
+        result=torch.unsqueeze(result,-1)
+
+        return result
+
+    def centroid_loss(self,predbox,gtbox):
         bias = abs(predbox - gtbox)
         max = torch.max(predbox, gtbox)
-        log = torch.log(1 - bias / max)
+        log = torch.log(1 - torch.clip(input=(bias / max), min=1))
         result = -torch.mean(log)
+        if torch.isnan(result):
+            result = smooth_l1_loss(predbox, gtbox)
+            print("Now the loss is from smoothL1")
         length_loss = torch.unsqueeze(result, -1)
-        
-        centroid_loss,predbox_x,predbox_y,gtbox_x,gtbox_y=self.get_centroid(predbox,gtbox) 
+
+        centroid_loss, predbox_x, predbox_y, gtbox_x, gtbox_y = self.get_centroid(predbox, gtbox)
 
         a_p1_angle = torch.arctan((predbox[:, 1] - predbox_y) / (predbox[:, 0] - predbox_x))
         a_p2_angle = torch.arctan((predbox[:, 3] - predbox_y) / (predbox[:, 2] - predbox_x))
@@ -35,7 +75,7 @@ class Poly_loss:
         result = torch.mean(p1_result + p2_result + p3_result + p4_result)
         angle_loss = torch.unsqueeze(result, -1)
 
-        loss=self.centroid_loss_weight*centroid_loss+self.angle_loss_weight*angle_loss+self.length_loss_weight*length_loss
+        loss = self.centroid_loss_weight * centroid_loss + self.angle_loss_weight * angle_loss + self.length_loss_weight * length_loss
         return loss
 
     def get_centroid(self,predbox, gtbox):

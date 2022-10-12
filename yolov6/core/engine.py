@@ -46,6 +46,7 @@ class Trainer:
         self.data_dict = load_yaml(args.data_path)
         self.num_classes = self.data_dict['nc']
         self.train_loader, self.val_loader = self.get_data_loader(args, cfg, self.data_dict)
+        self.strides=cfg.model.head.strides
         # get model and optimizer
         model = self.get_model(args, cfg, self.num_classes, device)
         if self.args.distill:
@@ -195,7 +196,7 @@ class Trainer:
                             batch_size=self.batch_size // self.world_size * 2,
                             img_size=self.img_size,
                             model=self.ema.ema if self.args.calib is False else self.model,
-                            conf_thres=0.01,
+                            conf_thres=0.1,
                             # iou_thres=0.3,
                             dataloader=self.val_loader,
                             save_dir=self.save_dir,
@@ -250,7 +251,8 @@ class Trainer:
         self.compute_loss = ComputeLoss(num_classes=self.data_dict['nc'],
                                         ori_img_size=self.img_size,
                                         use_dfl=self.cfg.model.head.use_dfl,
-                                        reg_max=self.cfg.model.head.reg_max,)
+                                        reg_max=self.cfg.model.head.reg_max,
+                                        fpn_strides=self.strides)
         if self.args.distill:                             
             self.compute_loss_distill = ComputeLoss_distill(num_classes=self.data_dict['nc'],
                                                             ori_img_size=self.img_size,
@@ -258,6 +260,7 @@ class Trainer:
                                                             reg_max=self.cfg.model.head.reg_max,
                                                             distill_weight = self.cfg.model.head.distill_weight,
                                                             distill_feat = self.args.distill_feat,
+                                                            fpn_strides=self.strides
                                                             )
 
     def prepare_for_steps(self):
