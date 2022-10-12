@@ -11,7 +11,7 @@ class Poly_loss:
         self.length_loss_weight=length_loss_weight
 
     def __call__(self, predbox, gtbox):
-        return self.smoothLnloss(predbox,gtbox)
+        return self.centroid_loss(predbox,gtbox)
 
     def smoothLnloss(self,predbox,gtbox):
         wchr=torch.max(predbox[:,2],predbox[:,4])-torch.min(predbox[:,0],predbox[:,6])
@@ -33,9 +33,9 @@ class Poly_loss:
         d_p4_x=(gtbox[:,6]-predbox[:,6])/wchr
         d_p4_y=(gtbox[:,7]-predbox[:,7])/hchr
 
-        lnloss=lambda x:(torch.abs(x)+1)*torch.log(torch.abs(x)+1)-abs(x)
+        lnloss=lambda x:abs((torch.abs(x)+1)*torch.log(torch.abs(x)+1)-abs(x))
 
-        d_points=torch.cat([d_centroid_x,d_centroid_y,d_p1_x,d_p1_y,d_p2_x,d_p2_y,d_p3_x,d_p3_y,d_p4_x,d_p4_y],dim=-1)
+        d_points=torch.cat([d_centroid_x,d_centroid_y,d_p1_x,d_p1_y,d_p2_x,d_p2_y,d_p3_x,d_p3_y,d_p4_x,d_p4_y])
 
         d_centroid_x=lnloss(d_points)
 
