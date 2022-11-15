@@ -99,17 +99,45 @@ def iou_calculator(box1, box2, eps=1e-9): # for poly now
     px1y1, px2y2,px3y3,px4y4 = box1[:, :, :, 0:2], box1[:, :, :, 2:4],box1[:, :, :, 4:6],box1[:, :, :, 6:8]
     gx1y1, gx2y2,gx3y3,gx4y4 = box2[:, :, :, 0:2], box2[:, :, :, 2:4],box2[:, :, :, 4:6],box2[:, :, :, 6:8]
 
-    x1y1 = torch.maximum(px1y1, gx1y1) # 输出二者中较大的那一个数 （在该维度上）
-    # x2y2 = torch.minimum(px2y2, gx2y2)
-    x3y3 = torch.minimum(px3y3, gx3y3)
-    # x4y4 = torch.minimum(px4y4, gx4y4)
+    pboxes_tx = (px1y1[:,:,:, 0] + px2y2[:,:,:, 0]) / 2
+    pboxes_bx = (px4y4[:,:,:, 0] + px3y3[:,:, :,0]) / 2
+    pboxes_ly = (px1y1[:,:, :,1] + px4y4[:,:, :,1]) / 2
+    pboxes_ry = (px2y2[:,:, :,1] + px3y3[:,:, :,1]) / 2
 
-    overlap = (x3y3 - x1y1).clip(0).prod(-1) # clip limit to [] prod 将该维度的所有数相乘  此处仍需优化 目前沿用正方形的方法近似 clip 0 可以规避问题 令不相交的交集为0
-    area1 = (px3y3 - px1y1).clip(0).prod(-1)
-    area2 = (gx3y3 - gx1y1).clip(0).prod(-1)
-    union = area1 + area2 - overlap + eps
+    pboxes_cx=(pboxes_tx+pboxes_bx)/2
+    pboxes_cy=(pboxes_ly+pboxes_ry)/2
 
-    return overlap / union
+    p_center=torch.stack([pboxes_cx,pboxes_cy],-1)
+
+
+    gboxes_tx = (gx1y1[:,:, :,0] + gx2y2[:,:,:, 0]) / 2
+    gboxes_bx = (gx4y4[:,:,:, 0] + gx3y3[:,:, :,0]) / 2
+    gboxes_ly = (gx1y1[:,:, :,1] + gx4y4[:,:, :,1]) / 2
+    gboxes_ry = (gx2y2[:,:, :,1] + gx3y3[:,:,:, 1]) / 2
+
+    gboxes_cx=(gboxes_tx+gboxes_bx)/2
+    gboxes_cy=(gboxes_ly+gboxes_ry)/2
+
+    g_center=torch.stack([gboxes_cx,gboxes_cy],-1)
+
+
+    gx2y2=torch.stack([gx3y3[:,:,:,0],gx1y1[:,:,:,1]],-1)
+    gx4y4=torch.stack([gx1y1[:,:,:,0],gx3y3[:,:,:,1]],-1)
+    result=1-0.1*(torch.abs(p_center[:,:,:,0]-g_center[:,:,:,0])/320 + torch.abs(p_center[:,:,:,1]-g_center[:,:,:,1])/320 + torch.abs(px1y1[:,:,:,0]-gx1y1[:,:,:,0])/320 + torch.abs(px1y1[:,:,:,1]-gx1y1[:,:,:,1])/320 + torch.abs(px2y2[:,:,:,0]-gx2y2[:,:,:,0])/320+torch.abs(px2y2[:,:,:,1]-gx2y2[:,:,:,1])/320 + torch.abs(px3y3[:,:,:,0]-gx3y3[:,:,:,0])/320+torch.abs(px3y3[:,:,:,1]-gx3y3[:,:,:,1])/320 + torch.abs(px4y4[:,:,:,0]-gx4y4[:,:,:,0])/320+torch.abs(px4y4[:,:,:,1]-gx4y4[:,:,:,1])/320)
+
+
+    # x1y1 = torch.maximum(px1y1, gx1y1) # 输出二者中较大的那一个数 （在该维度上）
+    # # x2y2 = torch.minimum(px2y2, gx2y2)
+    # x3y3 = torch.minimum(px3y3, gx3y3)
+    # # x4y4 = torch.minimum(px4y4, gx4y4)
+    # 
+    # overlap = (x3y3 - x1y1).clip(0).prod(-1) # clip limit to [] prod 将该维度的所有数相乘  此处仍需优化 目前沿用正方形的方法近似 clip 0 可以规避问题 令不相交的交集为0
+    # area1 = (px3y3 - px1y1).clip(0).prod(-1)
+    # area2 = (gx3y3 - gx1y1).clip(0).prod(-1)
+    # union = area1 + area2 - overlap + eps
+
+    # return overlap / union
+    return result
 
 from shapely.geometry import Polygon
 

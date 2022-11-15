@@ -46,13 +46,14 @@ class Poly_loss:
         return result
 
     def centroid_loss(self,predbox,gtbox):
-        bias = abs(predbox - gtbox)
-        max = torch.max(predbox, gtbox)
-        log = torch.log(1 - torch.clip(input=(bias / max), min=1))
-        result = -torch.mean(log)
-        if torch.isnan(result):
-            result = smooth_l1_loss(predbox, gtbox)
-            print("Now the loss is from smoothL1")
+        # bias = abs(predbox - gtbox)
+        # max = torch.max(predbox, gtbox)
+        # log = torch.log(1 - torch.clip(input=(bias / max), min=1))
+        # result = -torch.mean(log)
+        # if torch.isnan(result):
+        #     result = smooth_l1_loss(predbox, gtbox)
+        #     print("Now the loss is from smoothL1")
+        result=smooth_l1_loss(predbox,gtbox)
         length_loss = torch.unsqueeze(result, -1)
 
         centroid_loss, predbox_x, predbox_y, gtbox_x, gtbox_y = self.get_centroid(predbox, gtbox)

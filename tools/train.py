@@ -34,7 +34,7 @@ def get_args_parser(add_help=True):
     parser.add_argument('--eval-final-only', action='store_true', help='only evaluate at the final epoch')
     parser.add_argument('--heavy-eval-range', default=20, type=int,
                         help='evaluating every epoch for last such epochs (can be jointly used with --eval-interval)')
-    parser.add_argument('--check-images', default=False,action='store_true', help='check images when initializing datasets')
+    parser.add_argument('--check-images', default=True,action='store_true', help='check images when initializing datasets')
     parser.add_argument('--check-labels', default=True,action='store_true', help='check label files when initializing datasets')
     parser.add_argument('--output-dir', default='D:\yolov6_self\YOLOv6\\result', type=str, help='path to save outputs')
     parser.add_argument('--name', default='s_config_result', type=str, help='experiment name, saved to output_dir/name')

@@ -53,6 +53,5 @@ data_aug = dict(
     mosaic=1.0,
     mixup=0.0,
 )
-
 # Choose Rep-block by the training Mode, choices=["repvgg", "hyper-search", "repopt"]
 training_mode='hyper_search'
